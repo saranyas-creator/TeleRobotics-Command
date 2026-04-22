@@ -7,6 +7,11 @@ The robot software must open the port and register itself before sending any oth
 ### 1. Register Message (Robot -> Operator)
 The robot sends this JSON object to identify itself.
 
+| Header 1 | Header 2 | Header 3 |
+| -------- | -------- | -------- |
+| Row 1, Col 1 | Row 1, Col 2 | Row 1, Col 3 |
+| Row 2, Col 1 | Row 2, Col 2 | Row 2, Col 3 |
+
 > [!IMPORTANT]
 > This must be the first message sent after the connection is established.
 
@@ -22,7 +27,3 @@ The robot sends this JSON object to identify itself.
     }
 }
 
-| Header 1 | Header 2 | Header 3 |
-| -------- | -------- | -------- |
-| Row 1, Col 1 | Row 1, Col 2 | Row 1, Col 3 |
-| Row 2, Col 1 | Row 2, Col 2 | Row 2, Col 3 |

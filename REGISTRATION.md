@@ -1,5 +1,7 @@
 ### 🖥️ Registration Window: Protocol Data Mapping
 
+### 🖥️ Registration Window: Protocol Data Mapping
+
 | S.NO | Button | UI Command (Sent to Robot) | Robot Response (Sent to UI) |
 | :--- | :--- | :--- | :--- |
 | 1 | **Start** | <pre>{<br>  "id": "cmd_id",<br>  "source": "UI_CMD",<br>  "target": "ROBOT_CMD",<br>  "widget": "Registration",<br>  "type": "COMMAND",<br>  "priority": 1,<br>  "payload": {<br>    "action": "start"<br>  }<br>}</pre> | <pre>{<br>  "id": "cmd_id",<br>  "source": "ROBOT_CMD",<br>  "target": "UI_CMD",<br>  "type": "RESPONSE",<br>  "priority": 1,<br>  "payload": {<br>    "action": "start",<br>    "success": true,<br>    "message": "start executed successfully"<br>  }<br>}</pre> |

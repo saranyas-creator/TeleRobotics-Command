@@ -1,6 +1,6 @@
 ### 🖥️ Registration Window: Protocol Data Mapping
 
-| S.NO | Button | Response 1 (UI To Robot) | Response 2 (Sent to UI) | Response 3 ( Robot to UI) |
+| S.NO | Button | Response 1 (UI To Robot) | Response 2 | Response 3 ( Robot to UI) |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | **Start** | <pre>{<br>  "id": "cmd_id",<br>  "source": "UI_CMD",<br>  "target": "ROBOT_CMD",<br>  "widget": "Registration",<br>  "type": "COMMAND",<br>  "priority": 1,<br>  "payload": {<br>    "action": "start"<br>  }<br>}</pre> | <pre>{<br>  "id": "cmd_id",<br>  "source": "ROBOT_CMD",<br>  "target": "UI_CMD",<br>  "type": "RESPONSE",<br>  "priority": 1,<br>  "payload": {<br>    "action": "start",<br>    "success": true,<br>    "message": "start executed successfully"<br>  }<br>}</pre> |
 | 2 | **Stop** | <pre>{<br>  "id": "cmd_id",<br>  "source": "UI_CMD",<br>  "target": "ROBOT_CMD",<br>  "widget": "Registration",<br>  "type": "COMMAND",<br>  "priority": 1,<br>  "payload": {<br>    "action": "stop"<br>  }<br>}</pre> | <pre>{<br>  "id": "cmd_id",<br>  "source": "ROBOT_CMD",<br>  "target": "UI_CMD",<br>  "type": "RESPONSE",<br>  "priority": 1,<br>  "payload": {<br>    "action": "stop",<br>    "success": true,<br>    "message": "stop executed successfully"<br>  }<br>}</pre> |

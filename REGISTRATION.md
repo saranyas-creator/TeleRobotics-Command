@@ -1,13 +1,99 @@
 ### 🖥️ Registration Window: Full Command & Response Mapping
 
-| S.NO | Button | UI Command (Sent to Robot) | Robot Response (Sent to UI) |
-| :--- | :--- | :--- | :--- |
-| 1 | **Start** | `{<br>"id": "cmd_id",<br>"source": "UI_CMD",<br>"target": "ROBOT_CMD",<br>"widget": "Registration",<br>"type": "COMMAND",<br>"payload": {"action": "start"}<br>}` | `{<br>"id": "cmd_id",<br>"source": "ROBOT_CMD",<br>"target": "UI_CMD",<br>"type": "RESPONSE",<br>"payload": {<br>"action": "start",<br>"success": true,<br>"message": "start executed successfully"<br>}<br>}` |
-| 2 | **Stop** | `{<br>"id": "cmd_id",<br>"source": "UI_CMD",<br>"target": "ROBOT_CMD",<br>"widget": "Registration",<br>"type": "COMMAND",<br>"payload": {"action": "stop"}<br>}` | `{<br>"id": "cmd_id",<br>"source": "ROBOT_CMD",<br>"target": "UI_CMD",<br>"type": "RESPONSE",<br>"payload": {<br>"action": "stop",<br>"success": true,<br>"message": "stop executed successfully"<br>}<br>}` |
-| 3 | **Home** | `{<br>"id": "cmd_id",<br>"source": "UI_CMD",<br>"target": "ROBOT_CMD",<br>"widget": "Registration",<br>"type": "COMMAND",<br>"payload": {"action": "home"}<br>}` | `{<br>"id": "cmd_id",<br>"source": "ROBOT_CMD",<br>"target": "UI_CMD",<br>"type": "RESPONSE",<br>"payload": {<br>"action": "home",<br>"success": true,<br>"message": "home executed successfully"<br>}<br>}` |
-| 4 | **Reset** | `{<br>"id": "cmd_id",<br>"source": "UI_CMD",<br>"target": "ROBOT_CMD",<br>"widget": "System",<br>"type": "COMMAND",<br>"payload": {"action": "reset"}<br>}` | `{<br>"id": "cmd_id",<br>"source": "ROBOT_CMD",<br>"target": "UI_CMD",<br>"type": "RESPONSE",<br>"payload": {<br>"action": "reset",<br>"success": true,<br>"message": "RESET_DONE"<br>}<br>}` |
+### 🖥️ Registration Window: Command & Response Mapping
 
----
-
-> [!TIP]
-> **Pro Tip:** In the table above, the `<br>` tags are used to force the JSON onto new lines so the table doesn't grow infinitely wide. On your GitHub Pages site, this will appear as a clean, vertical code block inside the cell.
+<table>
+  <tr>
+    <th>S.NO</th>
+    <th>Button</th>
+    <th>UI Command (Sent to Robot)</th>
+    <th>Robot Response (Sent to UI)</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td><b>Start</b></td>
+    <td>
+      <pre><code>{
+  "id": "&lt;cmd_id&gt;",
+  "source": "UI_CMD",
+  "target": "ROBOT_CMD",
+  "widget": "Registration",
+  "type": "COMMAND",
+  "payload": {
+    "action": "start"
+  }
+}</code></pre>
+    </td>
+    <td>
+      <pre><code>{
+  "id": "&lt;cmd_id&gt;",
+  "source": "ROBOT_CMD",
+  "target": "UI_CMD",
+  "type": "RESPONSE",
+  "payload": {
+    "action": "start",
+    "success": true,
+    "message": "start executed successfully"
+  }
+}</code></pre>
+    </td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><b>Stop</b></td>
+    <td>
+      <pre><code>{
+  "id": "&lt;cmd_id&gt;",
+  "source": "UI_CMD",
+  "target": "ROBOT_CMD",
+  "widget": "Registration",
+  "type": "COMMAND",
+  "payload": {
+    "action": "stop"
+  }
+}</code></pre>
+    </td>
+    <td>
+      <pre><code>{
+  "id": "&lt;cmd_id&gt;",
+  "source": "ROBOT_CMD",
+  "target": "UI_CMD",
+  "type": "RESPONSE",
+  "payload": {
+    "action": "stop",
+    "success": true,
+    "message": "stop executed successfully"
+  }
+}</code></pre>
+    </td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td><b>Home</b></td>
+    <td>
+      <pre><code>{
+  "id": "&lt;cmd_id&gt;",
+  "source": "UI_CMD",
+  "target": "ROBOT_CMD",
+  "widget": "Registration",
+  "type": "COMMAND",
+  "payload": {
+    "action": "home"
+  }
+}</code></pre>
+    </td>
+    <td>
+      <pre><code>{
+  "id": "&lt;cmd_id&gt;",
+  "source": "ROBOT_CMD",
+  "target": "UI_CMD",
+  "type": "RESPONSE",
+  "payload": {
+    "action": "home",
+    "success": true,
+    "message": "home executed successfully"
+  }
+}</code></pre>
+    </td>
+  </tr>
+</table>

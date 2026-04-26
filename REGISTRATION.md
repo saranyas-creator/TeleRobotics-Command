@@ -1,6 +1,6 @@
 ### 🖥️ Registration Window: Protocol Data Mapping
 
-| S.NO | Button | Response 1 (UI To Robot) | Response 2 | Response 3 ( Robot to UI) |
+| S.NO | Button | Response 1<br>(UI To Robot) | Response 2 | Response 3<br>(Robot to UI) |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | **Reset** | <pre>{<br>  "id": "cmd_1772871779368",<br>  "source": "UI_CMD",<br>  "target": "ROBOT_CMD",<br>  "type": "COMMAND",<br>  "widget": "System",<br>  "priority": 1,<br>  "payload": {<br>    "action": "reset"<br>  }<br>}</pre> | <pre>{<br>  "id": "cmd_1772871779368",<br>  "source": "ROBOT_CMD",<br>  "target": "UI_CMD",<br>  "type": "RESPONSE",<br>  "priority": 1,<br>  "payload": {<br>    "action": "reset",<br>    "success": true,<br>    "message": "RESET_RECEIVED"<br>  }<br>}</pre> | <pre>{<br>  "id": "cmd_1772871779368",<br>  "source": "ROBOT_CMD",<br>  "target": "UI_CMD",<br>  "type": "RESPONSE",<br>  "priority": 1,<br>  "payload": {<br>    "action": "reset",<br>    "success": true,<br>    "message": "RESET_DONE"<br>  }<br>}</pre> |
 | 2 | **Start** | <pre>{<br>  "id": "cmd_id",<br>  "source": "UI_CMD",<br>  "target": "ROBOT_CMD",<br>  "widget": "Registration",<br>  "type": "COMMAND",<br>  "priority": 1,<br>  "payload": {<br>    "action": "start"<br>  }<br>}</pre> | <pre>{<br>  "id": "cmd_id",<br>  "source": "ROBOT_CMD",<br>  "target": "UI_CMD",<br>  "type": "RESPONSE",<br>  "priority": 1,<br>  "payload": {<br>    "action": "start",<br>    "success": true,<br>    "message": "start executed successfully"<br>  }<br>}</pre> | |

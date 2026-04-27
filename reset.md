@@ -1,4 +1,4 @@
-###  Registration Window
+# Registration Window
 
 | S.NO | Button | Response 1<br>(UI To Robot) | Response 2 | Response 3<br>(Robot to UI) |
 | :--- | :--- | :--- | :--- | :--- |

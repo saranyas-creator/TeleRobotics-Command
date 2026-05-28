@@ -6,7 +6,6 @@ Follow these step-by-step instructions to clone, configure, build, and install V
 
 # Step 1: Clone VTK Source
 
-Create a dedicated folder in your home directory and clone the official VTK source code repository.
 
 ```bash
 # Create directory and navigate into it
@@ -36,9 +35,7 @@ cd build
 
 Use CMake to generate the build files. This step explicitly points VTK to your local Qt6 installation and enables the required Qt rendering modules.
 
-> ⚠️ **IMPORTANT:**
-> Replace `<YOUR_USERNAME>` with your actual Linux username.
-> Also ensure the Qt version number (`6.10.3`) matches your installed Qt version.
+
 
 ```bash
 cmake ../source \
@@ -72,9 +69,6 @@ Expected result:
 
 Compile VTK from source.
 
-> ⚠️ **NOTE:**
-> Using too many parallel jobs may cause memory issues on low-RAM systems.
-> `-j2` is recommended for most laptops.
 
 ```bash
 make -j2
@@ -84,7 +78,7 @@ make -j2
 
 # Step 6: Install VTK
 
-Install VTK system-wide so Qt Creator and other applications can automatically detect it.
+
 
 ```bash
 sudo make install
@@ -141,64 +135,5 @@ vtk_module_autoinit(
 
 ---
 
-# Important Notes
 
-* Do NOT hardcode `VTK_DIR` inside `CMakeLists.txt`.
-* Both VTK and the Qt application must use the same Qt version (Qt6).
-* If Qt5/Qt6 conflicts occur, delete the build directory and rebuild.
-* If compilation fails due to insufficient RAM, reduce parallel jobs:
-
-```bash
-make -j1
-```
-
-or
-
-```bash
-make -j2
-```
-
----
-
-# Clean Rebuild (If Required)
-
-If configuration issues occur:
-
-```bash
-rm -rf build
-mkdir build
-cd build
-```
-
-Then repeat the configuration steps again.
-
----
-
-# Verify Qt Version Used by VTK
-
-Run:
-
-```bash
-grep QT_VERSION_MAJOR CMakeCache.txt
-```
-
-Expected output:
-
-```bash
-QT_VERSION_MAJOR:UNINITIALIZED=6
-```
-
----
-
-# Clean Qt Application Build
-
-After installing VTK, clean the Qt application's build directory before rebuilding:
-
-```bash
-rm -rf <YOUR_QT_PROJECT>/build
-```
-
-Then reopen Qt Creator and rebuild the project.
-
----
 

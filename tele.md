@@ -84,12 +84,6 @@ make -j2
 sudo make install
 ```
 
-Update the shared library cache:
-
-```bash
-sudo ldconfig
-```
-
 ---
 
 # Step 7: Verify Installation

@@ -50,14 +50,15 @@ The Router Service runs continuously and listens for messages from all registere
 ## Dealer Services
 
 The current implementation contains six DEALER services.
+```text
+                           ROUTER
+                              │
+ ┌────────────┬────────────┬────────────┬────────────┬────────────┬────────────┐
+ │            │            │            │            │            │
+ ▼            ▼            ▼            ▼            ▼            ▼
 
-                    ROUTER
-                       │
- ┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
- │         │         │         │         │         │
- ▼         ▼         ▼         ▼         ▼         ▼
-
-UI_CMD  ROBOT_CMD UI_CAMERA ROBOT_CAMERA UI_WATCHDOG ROBOT_WATCHDOG
+UI_CMD     ROBOT_CMD    UI_CAMERA   ROBOT_CAMERA  UI_WATCHDOG  ROBOT_WATCHDOG
+```
 
 | Dealer         | Description                          |
 | -------------- | ------------------------------------ |

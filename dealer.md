@@ -19,7 +19,7 @@ The DEALER sockets act as communication endpoints that connect to the ROUTER and
       ┌────────────────┼────────────────┐
       │                │                │
       ▼                ▼                ▼
-   DEALER           DEALER          DEALER
+   DEALER-1           DEALER-2        DEALER-3
 ```
 
 All communication between services flows through the ROUTER.
@@ -277,18 +277,6 @@ ROBOT_CAMERA
 ### 5.3 Watchdog Flow
 
 Used for exchanging watchdog and health-monitoring messages between UI and Robot services.
-
-#### UI Watchdog → Robot Watchdog
-
-```text
-UI_WATCHDOG
-      │
-      ▼
-   ROUTER
-      │
-      ▼
-ROBOT_WATCHDOG
-```
 
 #### Robot Watchdog → UI Watchdog
 

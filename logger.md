@@ -44,6 +44,32 @@ to every log entry.
 
 ---
 
+# Log Entry Format
+
+All log entries follow the format:
+
+```text
+[Timestamp] [Level] [Thread ID] [Source File:Line Number] Message
+```
+
+**Example**
+
+```text
+[2026-06-20 16:59:34.551] [info] [1508310] [main.cpp:28]
+Communication Service Starting...
+```
+
+| Field       | Description                              |
+| ----------- | ---------------------------------------- |
+| Timestamp   | Date and time when the event occurred    |
+| Level       | Logging level (INFO, DEBUG, WARN, ERROR) |
+| Thread ID   | Thread that generated the log            |
+| Source File | File where the log was generated         |
+| Line Number | Source code line number                  |
+| Message     | Event description                        |
+
+---
+
 # Logging Levels
 
 ## 1. INFO
@@ -126,33 +152,4 @@ ZMQ Forward Error to UI CMD
 [2026-06-20 17:10:50.946] [error] [1558750] [camera_service.cpp:196]
 Failed to create pipeline for track 0:
 no property "rtcpsync" in element "rtpjitterbuffer"
-```
-
----
-
-# Log Entry Format
-
-All log entries follow the format:
-
-```text
-[Timestamp] [Level] [Thread ID] [Source File:Line Number] Message
-```
-
-**Example**
-
-```text
-[2026-06-20 16:59:34.551] [info] [1508310] [main.cpp:28]
-Communication Service Starting...
-```
-
-| Field       | Description                              |
-| ----------- | ---------------------------------------- |
-| Timestamp   | Date and time when the event occurred    |
-| Level       | Logging level (INFO, DEBUG, WARN, ERROR) |
-| Thread ID   | Thread that generated the log            |
-| Source File | File where the log was generated         |
-| Line Number | Source code line number                  |
-| Message     | Event description                        |
-
-```
 ```

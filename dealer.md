@@ -9,7 +9,7 @@ The pattern consists of:
 * One ROUTER socket
 * Multiple DEALER sockets
 
-The ROUTER acts as a central communication broker responsible for receiving, identifying, and forwarding messages.
+The ROUTER acts as a central message routing service responsible for receiving, identifying, and forwarding messages between registered dealers.
 
 The DEALER sockets act as communication endpoints that connect to the ROUTER and exchange messages through it.
 

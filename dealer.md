@@ -1,4 +1,4 @@
-# Router-Dealer Channel
+# Channel 1 - Router-Dealer Channel
 
 ## 1. ROUTER-DEALER Pattern
 

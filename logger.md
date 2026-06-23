@@ -1,7 +1,6 @@
 # Logging Framework (spdlog)
 
 ## What is spdlog?
-
 spdlog is a high-performance C++ logging library used to record application events during runtime.
 
 The Software Services module uses spdlog as the central logging framework to capture system events, communication status, warnings, errors, and debugging information.

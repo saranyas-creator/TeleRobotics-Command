@@ -194,9 +194,9 @@ The same registration lifecycle is followed by all six dealers before any messag
 
 ## 5. Message Routing
 
-Once a dealer successfully registers and receives a REGISTER_ACK, it can begin exchanging messages through the Router Service.
+Once a dealer successfully registers and receives a `REGISTER_ACK`, it can begin exchanging messages through the Router Service.
 
-The Router continuously listens for incoming messages from all registered dealers and forwards them to the appropriate destination based on the target field.
+The Router continuously listens for incoming messages from all registered dealers and forwards them to the appropriate destination based on the `target` field.
 
 ```text
 Receive Message
@@ -211,9 +211,11 @@ Receive Message
  Forward Message
 ```
 
-### 5.1 UI Command Flow
+### 5.1 Command Flow
 
-Used for forwarding commands from the UI to the Robot.
+Used for forwarding command messages between the UI and Robot services.
+
+#### UI Command → Robot Command
 
 ```text
 UI_CMD
@@ -225,9 +227,9 @@ UI_CMD
 ROBOT_CMD
 ```
 
-### 5.2 Robot Response Flow
+Used for forwarding command messages from the UI to the Robot.
 
-Used for forwarding responses from the Robot back to the UI.
+#### Robot Command → UI Command
 
 ```text
 ROBOT_CMD
@@ -239,7 +241,11 @@ ROBOT_CMD
  UI_CMD
 ```
 
-### 5.3 Camera Signaling Flow
+Used for forwarding command acknowledgements, status updates, and robot-generated messages to the UI.
+
+### 5.2 Camera Signaling Flow
+
+Used for exchanging WebRTC signaling messages between the UI and Robot camera services.
 
 #### UI Camera → Robot Camera
 
@@ -265,7 +271,11 @@ ROBOT_CAMERA
   UI_CAMERA
 ```
 
-### 5.4 Watchdog Flow
+### 5.3 Watchdog Flow
+
+Used for exchanging watchdog and health-monitoring messages between UI and Robot services.
+
+#### UI Watchdog → Robot Watchdog
 
 ```text
 UI_WATCHDOG
@@ -276,6 +286,19 @@ UI_WATCHDOG
       ▼
 ROBOT_WATCHDOG
 ```
+
+#### Robot Watchdog → UI Watchdog
+
+```text
+ROBOT_WATCHDOG
+         │
+         ▼
+      ROUTER
+         │
+         ▼
+    UI_WATCHDOG
+```
+
 
 ## 6. Complete Communication Flow
 

@@ -1,6 +1,6 @@
 # Router-Dealer Channel
 
-## What is the ROUTER-DEALER Pattern?
+## 1. ROUTER-DEALER Pattern
 
 The Router-Dealer Channel is implemented using the ZeroMQ (ZMQ) ROUTER-DEALER messaging pattern.
 
@@ -24,9 +24,7 @@ The DEALER sockets act as communication endpoints that connect to the ROUTER and
 
 All communication between services flows through the ROUTER.
 
----
-
-## Router Service
+## 2. Router Service
 
 The Communication Layer contains a single ROUTER service.
 
@@ -45,11 +43,10 @@ The Router Service is responsible for:
 
 The Router Service runs continuously and listens for messages from all registered dealers.
 
----
-
-## Dealer Services
+## 3. Dealer Services
 
 The current implementation contains six DEALER services.
+
 ```text
                            ROUTER
                               │
@@ -71,9 +68,7 @@ UI_CMD     ROBOT_CMD    UI_CAMERA   ROBOT_CAMERA  UI_WATCHDOG  ROBOT_WATCHDOG
 
 Each dealer connects independently to the Router Service.
 
----
-
-## Dealer Registration
+## 4. Dealer Registration
 
 Before exchanging messages, every dealer must register itself with the Router Service.
 
@@ -81,25 +76,17 @@ Registration allows the Router to associate a Dealer Identity with a Dealer Role
 
 The same registration process is followed by all six dealers.
 
----
-
 ### Step 1: Create Dealer Socket
 
 Each service creates a ZeroMQ DEALER socket.
-
-**Example**
 
 ```cpp
 m_socket = zmq_socket(m_context, ZMQ_DEALER);
 ```
 
----
-
 ### Step 2: Assign Dealer Identity
 
 Each dealer is assigned a unique identity.
-
-**UI_CMD**
 
 ```cpp
 QByteArray identity = "UI_CMD";
@@ -122,8 +109,6 @@ UI_WATCHDOG
 ROBOT_WATCHDOG
 ```
 
----
-
 ### Step 3: Connect to Router
 
 The dealer connects to the Router Service.
@@ -143,15 +128,7 @@ UI_CMD
 ROUTER
 ```
 
-The same process is performed by all six dealers.
-
----
-
 ### Step 4: Send Registration Request
-
-After connecting, the dealer sends a REGISTER message.
-
-**Example**
 
 ```json
 {
@@ -166,47 +143,7 @@ After connecting, the dealer sends a REGISTER message.
 }
 ```
 
-The role changes depending on the dealer.
-
-Examples:
-
-```json
-{
-    "role": "ROBOT_CMD"
-}
-```
-
-```json
-{
-    "role": "UI_CAMERA"
-}
-```
-
-```json
-{
-    "role": "ROBOT_CAMERA"
-}
-```
-
-```json
-{
-    "role": "UI_WATCHDOG"
-}
-```
-
-```json
-{
-    "role": "ROBOT_WATCHDOG"
-}
-```
-
----
-
 ### Step 5: Router Registers Dealer
-
-When the Router receives a REGISTER message, it stores the dealer identity and role mapping.
-
-**Router Code**
 
 ```cpp
 identityManager.registerClient(
@@ -225,15 +162,7 @@ UI_WATCHDOG      → Identity E
 ROBOT_WATCHDOG   → Identity F
 ```
 
-This table is maintained by the Router and is later used for message forwarding.
-
----
-
 ### Step 6: Router Sends Registration Acknowledgement
-
-After successful registration, the Router sends a REGISTER_ACK message.
-
-**Example**
 
 ```json
 {
@@ -243,11 +172,7 @@ After successful registration, the Router sends a REGISTER_ACK message.
 }
 ```
 
----
-
 ### Step 7: Dealer Enters Operational State
-
-After receiving REGISTER_ACK, the dealer is considered registered and ready for communication.
 
 ```text
 Create Dealer
@@ -265,24 +190,13 @@ Receive REGISTER_ACK
 Ready for Communication
 ```
 
-The same registration lifecycle is followed by:
+The same registration lifecycle is followed by all six dealers before any messages are exchanged.
 
-```text
-UI_CMD
-ROBOT_CMD
-UI_CAMERA
-ROBOT_CAMERA
-UI_WATCHDOG
-ROBOT_WATCHDOG
-```
+## 5. Message Routing
 
-before any commands, camera signaling messages, or watchdog messages can be exchanged.
+Once a dealer successfully registers and receives a REGISTER_ACK, it can begin exchanging messages through the Router Service.
 
-## Message Routing
-
-Once a dealer successfully registers and receives a `REGISTER_ACK`, it can begin exchanging messages through the Router Service.
-
-The Router continuously listens for incoming messages from all registered dealers and forwards them to the appropriate destination based on the `target` field.
+The Router continuously listens for incoming messages from all registered dealers and forwards them to the appropriate destination based on the target field.
 
 ```text
 Receive Message
@@ -297,9 +211,7 @@ Receive Message
  Forward Message
 ```
 
----
-
-### UI Command Flow
+### 5.1 UI Command Flow
 
 Used for forwarding commands from the UI to the Robot.
 
@@ -313,33 +225,7 @@ UI_CMD
 ROBOT_CMD
 ```
 
-**Example Message**
-
-```json
-{
-    "id": "cmd_001",
-    "type": "COMMAND",
-    "source": "UI_CMD",
-    "target": "ROBOT_CMD",
-    "payload":
-    {
-        "action": "start_scan"
-    }
-}
-```
-
-**Router Logic**
-
-```cpp
-else if (target == "ROBOT_CMD")
-{
-    forwardToRobotCMD(router, data);
-}
-```
-
----
-
-### Robot Response Flow
+### 5.2 Robot Response Flow
 
 Used for forwarding responses from the Robot back to the UI.
 
@@ -353,31 +239,7 @@ ROBOT_CMD
  UI_CMD
 ```
 
-**Example Message**
-
-```json
-{
-    "id": "cmd_001",
-    "type": "COMMAND_ACK",
-    "source": "ROBOT_CMD",
-    "target": "UI_CMD"
-}
-```
-
-**Router Logic**
-
-```cpp
-else if (target == "UI_CMD")
-{
-    forwardToUICMD(router, data);
-}
-```
-
----
-
-### Camera Signaling Flow
-
-Used for WebRTC signaling messages exchanged between the UI and Robot camera services.
+### 5.3 Camera Signaling Flow
 
 #### UI Camera → Robot Camera
 
@@ -403,25 +265,7 @@ ROBOT_CAMERA
   UI_CAMERA
 ```
 
-**Router Logic**
-
-```cpp
-else if (target == "ROBOT_CAMERA")
-{
-    forwardToRobotCamera(router, data);
-}
-
-else if (target == "UI_CAMERA")
-{
-    forwardToUICamera(router, data);
-}
-```
-
----
-
-### Watchdog Flow
-
-Used for monitoring communication health and service availability.
+### 5.4 Watchdog Flow
 
 ```text
 UI_WATCHDOG
@@ -433,38 +277,18 @@ UI_WATCHDOG
 ROBOT_WATCHDOG
 ```
 
-The Router receives watchdog messages and forwards them to the Watchdog Handler for processing.
-
-**Router Logic**
-
-```cpp
-if (type == "WATCHDOG" &&
-    target == "UI_WATCHDOG")
-{
-    watchdogHandler.handle(
-        data,
-        router,
-        identityManager);
-}
-```
-
----
-
-### Complete Communication Flow
+## 6. Complete Communication Flow
 
 ```text
-                    ROUTER
-                       │
- ┌─────────────┬───────┼─────────────┐
- │             │       │             │
- ▼             ▼       ▼             ▼
+                           ROUTER
+                              │
+ ┌────────────┬────────────┬────────────┬────────────┬────────────┬────────────┐
+ │            │            │            │            │            │
+ ▼            ▼            ▼            ▼            ▼            ▼
 
-UI_CMD      UI_CAMERA  UI_WATCHDOG
-
-ROBOT_CMD   ROBOT_CAMERA ROBOT_WATCHDOG
+UI_CMD     ROBOT_CMD    UI_CAMERA   ROBOT_CAMERA  UI_WATCHDOG  ROBOT_WATCHDOG
 ```
 
 All command messages, camera signaling messages, watchdog messages, acknowledgements, and responses are routed through the Router Service.
 
 The Router acts as the central communication broker and ensures that messages reach the correct destination dealer without requiring direct connections between services.
-

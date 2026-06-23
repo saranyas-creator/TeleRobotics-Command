@@ -43,7 +43,7 @@ The Router Service is responsible for:
 * Forwarding messages to target dealers
 
 The Router Service runs continuously and listens for messages from all registered dealers.
----
+
 
 ## 3. Dealer Services
 
@@ -69,7 +69,7 @@ UI_CMD     ROBOT_CMD    UI_CAMERA   ROBOT_CAMERA  UI_WATCHDOG  ROBOT_WATCHDOG
 | ROBOT_WATCHDOG | Robot health monitoring endpoint     |
 
 Each dealer connects independently to the Router Service.
----
+
 
 ## 4. Dealer Registration
 

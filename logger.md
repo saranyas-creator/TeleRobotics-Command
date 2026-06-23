@@ -4,7 +4,7 @@
 
 spdlog is a high-performance C++ logging library used to record application events during runtime.
 
-The TeleRobotics software uses spdlog as the central logging framework to capture system events, communication status, warnings, errors, and debugging information.
+The Software Services module uses spdlog as the central logging framework to capture system events, communication status, warnings, errors, and debugging information.
 
 All logs are written to:
 

@@ -44,144 +44,115 @@ to every log entry.
 
 ---
 
-## Logging Levels
+# Logging Levels
 
-The project primarily uses four logging levels.
+## 1. INFO
 
-### INFO
+Used for normal system operations and successful events.
 
-Used to record normal system operations and successful events.
-
-Example:
+**Example Code**
 
 ```cpp
 SPDLOG_INFO("Communication Service Starting...");
 ```
 
-Log Output:
+**Example Output**
 
 ```text
 [2026-06-20 16:59:34.551] [info] [1508310] [main.cpp:28]
 Communication Service Starting...
 ```
 
-Use INFO when:
-
-* Service starts successfully
-* Service stops successfully
-* Device registration succeeds
-* Communication channels are established
-
 ---
 
-### DEBUG
+## 2. DEBUG
 
-Used for detailed runtime information helpful during development and troubleshooting.
+Used for detailed runtime information and message flow tracking.
 
-Example:
+**Example Code**
 
 ```cpp
 SPDLOG_DEBUG("Forwarding to Robot CMD: ROBOT_CMD");
 ```
 
-Log Output:
+**Example Output**
 
 ```text
-[2026-06-22 12:08:42.310] [debug] [396870]
-[router_service.cpp:186]
+[2026-06-22 12:08:42.310] [debug] [396870] [router_service.cpp:186]
 Forwarding to Robot CMD: ROBOT_CMD
 ```
 
-Use DEBUG when:
-
-* Tracking message routing
-* Monitoring internal state changes
-* Verifying communication flow
-* Debugging application behavior
-
 ---
 
-### WARN
+## 3. WARN
 
-Used when an unexpected situation occurs but the application can continue operating.
+Used for unexpected situations where the system can continue operating.
 
-Example:
+**Example Code**
 
 ```cpp
 SPDLOG_WARN("Robot response delayed");
 ```
 
-Possible Output:
+**Example Output**
 
 ```text
-[2026-06-22 12:15:10.421] [warn]
-[router_service.cpp:210]
+[2026-06-22 12:15:10.421] [warn] [396870] [router_service.cpp:210]
 Robot response delayed
 ```
 
-Use WARN when:
-
-* Latency becomes unusually high
-* Connection quality degrades
-* Retry mechanisms are activated
-* Non-critical issues occur
-
 ---
 
-### ERROR
+## 4. ERROR
 
-Used when an operation fails and developer attention is required.
+Used when an operation fails or an error condition occurs.
 
-Example:
+**Example Code**
 
 ```cpp
-SPDLOG_ERROR(
-    "Failed to create pipeline for track {}",
-    trackId
-);
+SPDLOG_ERROR("ZMQ Forward Error to UI CMD");
 ```
 
-Log Output:
+**Example Output**
 
 ```text
-[2026-06-20 17:10:50.946] [error]
-[camera_service.cpp:196]
-Failed to create pipeline for track 0
+[2026-06-22 12:20:05.112] [error] [396870] [router_service.cpp:220]
+ZMQ Forward Error to UI CMD
 ```
 
-Use ERROR when:
+**Example from Current Logs**
 
-* Camera initialization fails
-* Communication fails
-* File operations fail
-* Resource creation fails
+```text
+[2026-06-20 17:10:50.946] [error] [1558750] [camera_service.cpp:196]
+Failed to create pipeline for track 0:
+no property "rtcpsync" in element "rtpjitterbuffer"
+```
 
 ---
 
-## Log Entry Format
+# Log Entry Format
 
-Each log entry follows the format:
+All log entries follow the format:
 
 ```text
 [Timestamp] [Level] [Thread ID] [Source File:Line Number] Message
 ```
 
-Example:
+**Example**
 
 ```text
-[2026-06-20 16:59:34.551] [info] [1508310]
-[main.cpp:28]
+[2026-06-20 16:59:34.551] [info] [1508310] [main.cpp:28]
 Communication Service Starting...
 ```
 
-Meaning:
-
-* Timestamp → When the event occurred
-* Level → Severity of the event
-* Thread ID → Thread that generated the log
-* Source File → File generating the log
-* Line Number → Exact code location
-* Message → Description of the event
+| Field       | Description                              |
+| ----------- | ---------------------------------------- |
+| Timestamp   | Date and time when the event occurred    |
+| Level       | Logging level (INFO, DEBUG, WARN, ERROR) |
+| Thread ID   | Thread that generated the log            |
+| Source File | File where the log was generated         |
+| Line Number | Source code line number                  |
+| Message     | Event description                        |
 
 ```
 ```

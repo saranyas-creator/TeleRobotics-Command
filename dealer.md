@@ -279,3 +279,194 @@ ROBOT_WATCHDOG
 ```
 
 before any commands, camera signaling messages, or watchdog messages can be exchanged.
+
+## Message Routing
+
+Once a dealer successfully registers and receives a `REGISTER_ACK`, it can begin exchanging messages through the Router Service.
+
+The Router continuously listens for incoming messages from all registered dealers and forwards them to the appropriate destination based on the `target` field.
+
+```text
+Receive Message
+       │
+       ▼
+ Parse JSON
+       │
+       ▼
+ Determine Target
+       │
+       ▼
+ Forward Message
+```
+
+---
+
+### UI Command Flow
+
+Used for forwarding commands from the UI to the Robot.
+
+```text
+UI_CMD
+   │
+   ▼
+ ROUTER
+   │
+   ▼
+ROBOT_CMD
+```
+
+**Example Message**
+
+```json
+{
+    "id": "cmd_001",
+    "type": "COMMAND",
+    "source": "UI_CMD",
+    "target": "ROBOT_CMD",
+    "payload":
+    {
+        "action": "start_scan"
+    }
+}
+```
+
+**Router Logic**
+
+```cpp
+else if (target == "ROBOT_CMD")
+{
+    forwardToRobotCMD(router, data);
+}
+```
+
+---
+
+### Robot Response Flow
+
+Used for forwarding responses from the Robot back to the UI.
+
+```text
+ROBOT_CMD
+    │
+    ▼
+ ROUTER
+    │
+    ▼
+ UI_CMD
+```
+
+**Example Message**
+
+```json
+{
+    "id": "cmd_001",
+    "type": "COMMAND_ACK",
+    "source": "ROBOT_CMD",
+    "target": "UI_CMD"
+}
+```
+
+**Router Logic**
+
+```cpp
+else if (target == "UI_CMD")
+{
+    forwardToUICMD(router, data);
+}
+```
+
+---
+
+### Camera Signaling Flow
+
+Used for WebRTC signaling messages exchanged between the UI and Robot camera services.
+
+#### UI Camera → Robot Camera
+
+```text
+UI_CAMERA
+     │
+     ▼
+  ROUTER
+     │
+     ▼
+ROBOT_CAMERA
+```
+
+#### Robot Camera → UI Camera
+
+```text
+ROBOT_CAMERA
+      │
+      ▼
+   ROUTER
+      │
+      ▼
+  UI_CAMERA
+```
+
+**Router Logic**
+
+```cpp
+else if (target == "ROBOT_CAMERA")
+{
+    forwardToRobotCamera(router, data);
+}
+
+else if (target == "UI_CAMERA")
+{
+    forwardToUICamera(router, data);
+}
+```
+
+---
+
+### Watchdog Flow
+
+Used for monitoring communication health and service availability.
+
+```text
+UI_WATCHDOG
+      │
+      ▼
+   ROUTER
+      │
+      ▼
+ROBOT_WATCHDOG
+```
+
+The Router receives watchdog messages and forwards them to the Watchdog Handler for processing.
+
+**Router Logic**
+
+```cpp
+if (type == "WATCHDOG" &&
+    target == "UI_WATCHDOG")
+{
+    watchdogHandler.handle(
+        data,
+        router,
+        identityManager);
+}
+```
+
+---
+
+### Complete Communication Flow
+
+```text
+                    ROUTER
+                       │
+ ┌─────────────┬───────┼─────────────┐
+ │             │       │             │
+ ▼             ▼       ▼             ▼
+
+UI_CMD      UI_CAMERA  UI_WATCHDOG
+
+ROBOT_CMD   ROBOT_CAMERA ROBOT_WATCHDOG
+```
+
+All command messages, camera signaling messages, watchdog messages, acknowledgements, and responses are routed through the Router Service.
+
+The Router acts as the central communication broker and ensures that messages reach the correct destination dealer without requiring direct connections between services.
+

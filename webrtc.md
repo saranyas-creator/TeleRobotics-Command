@@ -15,44 +15,107 @@ The Router Service is used only during session establishment. Once the WebRTC co
 
 ---
 
-## 2. Components
-
-The WebRTC Channel consists of three services:
+## 2. Architecture
 
 ```text
-UI_CAMERA
-ROBOT_CAMERA
-ROUTER
+                         ROUTER
+                            │
+                            │ Signaling
+                            ▼
+
+UI_CAMERA  ←────────────→  ROBOT_CAMERA
+               WebRTC
+                    │
+                    ▼
+             GStreamer
+                    │
+                    ▼
+               ZMQ PUB
+                    │
+                    ▼
+               ZMQ SUB
+                    │
+                    ▼
+                Qt UI
 ```
 
-| Component    | Description                                             |
-| ------------ | ------------------------------------------------------- |
-| UI_CAMERA    | Receives video streams and distributes frames to the UI |
-| ROBOT_CAMERA | Captures and streams video from the robot side          |
-| ROUTER       | Handles signaling message exchange between UI and Robot |
+| Component    | Responsibility                       |
+| ------------ | ------------------------------------ |
+| ROUTER       | Signaling communication              |
+| UI_CAMERA    | Receives and processes video streams |
+| ROBOT_CAMERA | Captures and streams video           |
+| WebRTC       | Peer-to-peer video transport         |
+| GStreamer    | Video decoding and frame processing  |
+| PUB-SUB      | Local frame distribution             |
+| Qt UI        | Video display                        |
 
 ---
 
-## 3. Session Establishment
+## 3. Workflow
 
-Before video streaming begins, a WebRTC session must be established.
+The following workflow describes the complete lifecycle of a video stream from session establishment to display in the Qt user interface.
 
-### 3.1 Dealer Registration
+```text
+Registration
+      │
+      ▼
+WebRTC Request
+      │
+      ▼
+SDP Offer + ICE
+      │
+      ▼
+SDP Answer + ICE
+      │
+      ▼
+Peer Connection
+      │
+      ▼
+Video Streaming
+      │
+      ▼
+GStreamer Decoding
+      │
+      ▼
+PUB-SUB Distribution
+      │
+      ▼
+Qt Display
+```
 
-The UI_CAMERA service first registers itself with the Router Service.
+---
+
+## 4. Dealer Registration
+
+The WebRTC Channel uses the ROUTER-DEALER pattern for signaling communication.
+
+The signaling architecture contains one ROUTER and two DEALERS.
+
+```text
+            ROUTER
+               │
+      ┌────────┴────────┐
+      │                 │
+      ▼                 ▼
+
+ UI_CAMERA       ROBOT_CAMERA
+```
+
+Before a WebRTC session can be established, both camera services must register with the Router Service.
+
+### 4.1 UI_CAMERA Registration
 
 ```text
 UI_CAMERA
+     │
+ REGISTER
      │
      ▼
    ROUTER
 ```
 
-**Registration Message**
-
 ```json
 {
-    "id": "msg_001",
     "type": "REGISTER",
     "source": "UI_CAMERA",
     "target": "ROUTER",
@@ -63,13 +126,42 @@ UI_CAMERA
 }
 ```
 
-After successful registration, the Router sends a `REGISTER_ACK`.
+The Router stores the dealer identity and returns a `REGISTER_ACK`.
 
 ---
 
-### 3.2 WebRTC Request
+### 4.2 ROBOT_CAMERA Registration
 
-Once registration is complete, UI_CAMERA requests a WebRTC session.
+```text
+ROBOT_CAMERA
+      │
+  REGISTER
+      │
+      ▼
+   ROUTER
+```
+
+```json
+{
+    "type": "REGISTER",
+    "source": "ROBOT_CAMERA",
+    "target": "ROUTER",
+    "payload":
+    {
+        "role": "ROBOT_CAMERA"
+    }
+}
+```
+
+The Router stores the dealer identity and returns a `REGISTER_ACK`.
+
+After both dealers are registered, signaling communication can begin.
+
+---
+
+## 5. WebRTC Request
+
+Once registration is complete, UI_CAMERA initiates a WebRTC session.
 
 ```text
 UI_CAMERA
@@ -81,11 +173,8 @@ UI_CAMERA
 ROBOT_CAMERA
 ```
 
-**Request Message**
-
 ```json
 {
-    "id": "msg_001",
     "type": "WEBRTC_REQUEST",
     "source": "UI_CAMERA",
     "target": "ROBOT_CAMERA"
@@ -94,11 +183,68 @@ ROBOT_CAMERA
 
 The Router forwards the request to ROBOT_CAMERA.
 
+The request instructs ROBOT_CAMERA to create a WebRTC Offer.
+
 ---
 
-### 3.3 SDP Offer
+## 6. SDP Offer + ICE
 
-After receiving the request, ROBOT_CAMERA creates a WebRTC Offer.
+### 6.1 What is ICE?
+
+ICE (Interactive Connectivity Establishment) is a WebRTC mechanism used to discover network paths between two peers.
+
+Before a direct connection can be established, both peers must know:
+
+* IP Address
+* Port Number
+* Transport Protocol
+
+This information is represented as ICE Candidates.
+
+Example:
+
+```text
+IP Address : 192.168.1.10
+Port       : 5000
+Protocol   : UDP
+```
+
+The current implementation uses Non-Trickle ICE.
+
+ICE candidates are gathered automatically by WebRTC and embedded directly into the SDP before transmission.
+
+---
+
+### 6.2 SDP Offer Generation
+
+After receiving the WebRTC Request, ROBOT_CAMERA creates a WebRTC Peer Connection.
+
+WebRTC automatically:
+
+1. Creates an SDP Offer
+2. Gathers ICE Candidates
+3. Embeds ICE Candidates into the SDP Offer
+
+```text
+ROBOT_CAMERA
+      │
+      ▼
+Create Peer Connection
+      │
+      ▼
+Generate SDP Offer
+      │
+      ▼
+Gather ICE Candidates
+      │
+      ▼
+Embed ICE into SDP
+      │
+      ▼
+WEBRTC_OFFER
+```
+
+The Offer is forwarded through the Router.
 
 ```text
 ROBOT_CAMERA
@@ -110,7 +256,7 @@ ROBOT_CAMERA
   UI_CAMERA
 ```
 
-**Offer Message**
+Example:
 
 ```json
 {
@@ -125,20 +271,21 @@ ROBOT_CAMERA
 
 ---
 
-### 3.4 ICE Candidate Gathering
+## 7. SDP Answer + ICE
 
-ICE (Interactive Connectivity Establishment) is used by WebRTC to discover network paths between UI_CAMERA and ROBOT_CAMERA.
+UI_CAMERA receives the SDP Offer and configures its local Peer Connection.
 
-After receiving the SDP Offer and generating a local SDP Answer, WebRTC automatically gathers ICE candidates.
+WebRTC automatically:
 
-ICE candidates contain network information such as:
-
-* IP Address
-* Port Number
-* Transport Protocol
+1. Creates an SDP Answer
+2. Gathers ICE Candidates
+3. Embeds ICE Candidates into the SDP Answer
 
 ```text
 UI_CAMERA
+      │
+      ▼
+Receive SDP Offer
       │
       ▼
 Create SDP Answer
@@ -147,18 +294,13 @@ Create SDP Answer
 Gather ICE Candidates
       │
       ▼
-Embed ICE Candidates into SDP Answer
+Embed ICE into SDP
+      │
+      ▼
+WEBRTC_ANSWER
 ```
 
-The current implementation uses non-trickle ICE. ICE candidates are automatically generated by the WebRTC library and embedded into the SDP Answer before being sent to ROBOT_CAMERA.
-
-No separate ICE signaling messages are exchanged.
-
----
-
-### 3.5 SDP Answer
-
-UI_CAMERA receives the SDP Offer and generates an SDP Answer.
+The Answer is forwarded through the Router.
 
 ```text
 UI_CAMERA
@@ -170,7 +312,7 @@ UI_CAMERA
 ROBOT_CAMERA
 ```
 
-**Answer Message**
+Example:
 
 ```json
 {
@@ -183,48 +325,106 @@ ROBOT_CAMERA
 }
 ```
 
-The SDP Answer contains both the generated SDP information and the gathered ICE candidates.
-
 ---
 
-### 3.6 Peer Connection Established
+## 8. Peer Connection Establishment
 
-After SDP negotiation is completed, a direct WebRTC connection is established.
+After exchanging SDP information and ICE candidates, WebRTC establishes a direct peer-to-peer connection.
 
 ```text
 UI_CAMERA  ←────────────→  ROBOT_CAMERA
                  WebRTC
 ```
 
-At this point, the Router Service is no longer involved in media transport.
+At this stage:
+
+* Signaling is complete
+* Router participation ends
+* Direct media transport begins
+
+The Router Service is no longer involved in video streaming.
 
 ---
 
-## 4. Video Streaming
+## 9. Video Streaming
 
-Once the WebRTC connection is established, video packets are streamed directly from ROBOT_CAMERA to UI_CAMERA.
+Once the Peer Connection is established, ROBOT_CAMERA begins transmitting video.
 
 ```text
 ROBOT_CAMERA
       │
       ▼
- WebRTC Track
+ H264 RTP Packets
       │
       ▼
   UI_CAMERA
 ```
 
-The UI_CAMERA service receives video tracks and creates a dedicated processing pipeline for each incoming track.
+The UI_CAMERA service receives incoming WebRTC tracks.
+
+Each track creates a dedicated decoding pipeline.
 
 ---
 
-## 5. GStreamer Pipeline
+## 10. GStreamer Decoding Pipeline
 
-GStreamer is a multimedia processing framework used for video decoding and frame processing.
+### 10.1 What is GStreamer?
 
-The WebRTC Channel receives H264 RTP packets from ROBOT_CAMERA. These packets cannot be displayed directly by the Qt application and must first be decoded into RGB image frames.
+GStreamer is a multimedia processing framework used for video decoding, encoding, conversion, and streaming.
 
-A dedicated GStreamer pipeline is created for each incoming WebRTC track.
+In this project, WebRTC delivers:
+
+```text
+Compressed H264 RTP Packets
+```
+
+These packets cannot be displayed directly by the Qt application.
+
+They must first be converted into:
+
+```text
+RGB Image Frames
+```
+
+GStreamer performs this conversion.
+
+---
+
+### 10.2 Why GStreamer is Required
+
+Without GStreamer:
+
+```text
+WebRTC Packet
+      │
+      ▼
+Qt Display
+```
+
+is not possible.
+
+Instead:
+
+```text
+WebRTC Packet
+      │
+      ▼
+GStreamer
+      │
+      ▼
+RGB Frame
+      │
+      ▼
+Qt Display
+```
+
+GStreamer acts as the decoding engine between WebRTC and Qt.
+
+---
+
+### 10.3 Pipeline Flow
+
+For every incoming WebRTC track, a dedicated pipeline is created.
 
 ```text
 WebRTC Packet
@@ -254,7 +454,7 @@ appsink
 RGB Frame
 ```
 
-### Pipeline Components
+### 10.4 Pipeline Components
 
 | Component    | Purpose                                        |
 | ------------ | ---------------------------------------------- |
@@ -266,19 +466,25 @@ RGB Frame
 | videoscale   | Resizes frames to the required resolution      |
 | appsink      | Delivers decoded RGB frames to the application |
 
-The output of the pipeline is a decoded RGB frame that can be distributed to Qt UI components.
+Output:
+
+```text
+RGB Frame
+```
 
 ---
 
-## 6. PUB-SUB Architecture
+## 11. PUB-SUB Distribution
 
-The PUB-SUB (Publisher-Subscriber) pattern is used for local frame distribution within the UI application.
+### 11.1 What is PUB-SUB?
+
+PUB-SUB (Publisher-Subscriber) is a messaging pattern used to distribute data to multiple consumers.
 
 In this pattern:
 
-* A Publisher sends data
-* One or more Subscribers receive data
-* The Publisher does not need to know who the Subscribers are
+* Publisher sends data
+* Subscribers receive data
+* Publisher does not need to know who the subscribers are
 
 ```text
 Publisher
@@ -292,7 +498,7 @@ Publisher
 SUB SUB SUB SUB
 ```
 
-This architecture allows multiple UI components to receive the same video stream without modifying the Camera Service.
+This architecture allows multiple components to consume the same video stream.
 
 Examples:
 
@@ -301,47 +507,20 @@ Examples:
 * Image Processing Module
 * Future Analytics Components
 
-The WebRTC Channel is responsible for transporting video from ROBOT_CAMERA to UI_CAMERA.
-
-The PUB-SUB Channel is responsible for distributing decoded video frames within the UI application.
-
-```text
-ROBOT_CAMERA
-      │
-      ▼
-    WebRTC
-      │
-      ▼
-   UI_CAMERA
-      │
-      ▼
-    ZMQ PUB
-      │
-      ▼
-    ZMQ SUB
-      │
-      ▼
- Qt Components
-```
-
 ---
 
-## 7. Frame Distribution
-
-After a video frame is decoded by the GStreamer pipeline, UI_CAMERA publishes the frame using a ZeroMQ PUB socket.
-
-### 7.1 Publisher
+### 11.2 Publisher
 
 UI_CAMERA acts as the Publisher.
 
 ```text
-Decoded RGB Frame
-        │
-        ▼
-    UI_CAMERA
-        │
-        ▼
-     ZMQ PUB
+RGB Frame
+      │
+      ▼
+UI_CAMERA
+      │
+      ▼
+ ZMQ PUB
 ```
 
 Topic format:
@@ -356,7 +535,9 @@ Example:
 camera.frame.track_01
 ```
 
-### 7.2 Subscriber
+---
+
+### 11.3 Subscriber
 
 Qt UI components act as Subscribers.
 
@@ -373,90 +554,44 @@ Subscription:
 camera.frame.
 ```
 
-This allows subscribers to receive frames from all active video tracks.
+Subscribers receive frames from all active tracks.
 
 ---
 
-## 8. Complete Communication Flow
+## 12. Qt Display
+
+After receiving a frame from the PUB-SUB channel:
 
 ```text
-Phase 1 : Registration
-
-UI_CAMERA
+ZMQ SUB
      │
      ▼
-   ROUTER
-
-
-Phase 2 : Signaling
-
-UI_CAMERA
+ RGB Frame
      │
      ▼
-   ROUTER
+  QImage
      │
      ▼
-ROBOT_CAMERA
-
-SDP Offer
-ICE Gathering
-SDP Answer
-
-
-Phase 3 : Video Streaming
-
-UI_CAMERA  ←────────────→  ROBOT_CAMERA
-                 WebRTC
-
-
-Phase 4 : Frame Processing
-
-WebRTC Packet
-      │
-      ▼
-GStreamer Pipeline
-      │
-      ▼
-RGB Frame
-
-
-Phase 5 : Frame Distribution
-
-RGB Frame
-    │
-    ▼
- ZMQ PUB
-    │
-    ▼
- ZMQ SUB
-    │
-    ▼
- Qt UI
+ Qt Display
 ```
+
+The frame is converted into a QImage and displayed in the application.
 
 ---
 
-## 9. Architecture Summary
-
-The WebRTC Channel uses the Router-Dealer Channel only for signaling communication, including:
-
-* Dealer Registration
-* Session Initiation
-* SDP Offer Exchange
-* ICE Candidate Exchange
-* SDP Answer Exchange
-
-Once negotiation is complete, video data is streamed directly between UI_CAMERA and ROBOT_CAMERA through a WebRTC Peer Connection.
-
-Incoming H264 RTP packets are decoded using a dedicated GStreamer pipeline, producing RGB image frames.
-
-The decoded frames are then distributed locally through a ZeroMQ PUB-SUB channel, allowing Qt UI components and future services to subscribe and consume video frames independently.
+## 13. Architecture Summary
 
 ```text
 Dealer Registration
         │
         ▼
-WebRTC Signaling
+WebRTC Request
+        │
+        ▼
+SDP Offer + ICE
+        │
+        ▼
+SDP Answer + ICE
         │
         ▼
 Peer Connection
@@ -473,3 +608,7 @@ PUB-SUB Distribution
         ▼
 Qt Display
 ```
+
+The WebRTC Channel uses the Router-Dealer Channel only for signaling communication. Once SDP negotiation is completed, video data is streamed directly between UI_CAMERA and ROBOT_CAMERA through a WebRTC Peer Connection.
+
+Incoming H264 RTP packets are decoded using GStreamer and converted into RGB image frames. These frames are then distributed through a ZeroMQ PUB-SUB channel and displayed by Qt UI components.

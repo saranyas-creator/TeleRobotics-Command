@@ -56,7 +56,45 @@ flowchart TB
     TS --> UI
 ```
 
+```mermaid
+flowchart TB
 
+    J[Geomagic Touch]
+
+    subgraph Threads
+        H["Hardware Loop"]
+        TX["UDP TX Loop"]
+        RX["UDP RX Loop"]
+    end
+
+    subgraph Shared_State
+        direction LR
+        S1["S1<br/>ControllerToRobot"]
+        S2["S2<br/>RobotToController"]
+    end
+
+    R[Robot]
+
+    STW["SharedTelemetryWriter"]
+    SHM["Shared Memory"]
+    TS["TelemetryService"]
+    UI["Qt UI"]
+
+    J --> H
+
+    H -->|Write| S1
+    S1 -->|Read| TX
+    TX -->|ControllerToRobotMsg| R
+
+    R -->|RobotToControllerMsg| RX
+    RX -->|Write| S2
+    S2 -->|Read| H
+
+    RX -->|Publish| STW
+    STW --> SHM
+    SHM --> TS
+    TS --> UI
+```
 
 
 

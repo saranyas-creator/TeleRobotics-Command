@@ -14,7 +14,7 @@ The Teleoperation Channel consists of:
 
 ---
 
-
+# Teleoperation Channel Architecture
 
 ```mermaid
 flowchart TB
@@ -72,36 +72,6 @@ flowchart TB
     STW -->|Write| SHM
     SHM -->|Read| TS
     TS --> UI
-```
-```text
-                           Geomagic Touch
-                                  │
-                                  ▼
- ┌────────────────┬────────────────────────┬────────────────┐
- │                │                        │                │
- ▼                ▼                        ▼                ▼
-UDP TX       Hardware Loop             UDP RX           Robot
- │                │                        ▲
- │                │                        │
- ▼                ▼                        │
-┌─────────┐   ┌──────────────┐      ┌─────────┐
-│   S1    │   │ Controller   │      │   S2    │
-│Controller│   │ Processing   │      │ Robot   │
-│ToRobot   │   └──────┬──────┘      │ToController
-└────┬─────┘          │             └────┬─────┘
-     │                │                  ▲
-     └────────────────┼──────────────────┘
-                      │
-                      ▼
-              ┌──────────────────┐
-              │  Shared Memory   │
-              └────────┬─────────┘
-                       ▼
-             ┌────────────────────┐
-             │ TelemetryService   │
-             └────────┬───────────┘
-                      ▼
-                    Qt UI
 ```
 
 # Thread Communication

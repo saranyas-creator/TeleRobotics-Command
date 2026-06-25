@@ -1,3 +1,74 @@
+```mermaid
+flowchart TB
+
+    %% =========================
+    %% External Components
+    %% =========================
+    J[Geomagic Touch]
+    R[Robot]
+
+    %% =========================
+    %% Threads
+    %% =========================
+    H["1. Hardware Loop<br/>(Thread)"]
+    TX["2. UDP TX Loop<br/>(Thread)"]
+    RX["3. UDP RX Loop<br/>(Thread)"]
+
+    %% =========================
+    %% Shared States
+    %% =========================
+    S1["S1 : ControllerToRobot<br/>Shared State"]
+    S2["S2 : RobotToController<br/>Shared State"]
+
+    %% =========================
+    %% Shared Memory
+    %% =========================
+    STW["SharedTelemetryWriter"]
+    SHM["Shared Memory<br/>(Inter-Process)"]
+    TS["TelemetryService"]
+    UI["Qt UI"]
+
+    %% =========================
+    %% Hardware Connections
+    %% =========================
+    J --> H
+
+    %% =========================
+    %% Controller Data Flow
+    %% =========================
+    H -->|Write Controller Data| S1
+    S1 -->|Read Controller Data| TX
+    TX -->|Raw UDP<br/>ControllerToRobotMsg| R
+
+    %% =========================
+    %% Robot Telemetry Flow
+    %% =========================
+    R -->|Raw UDP<br/>RobotToControllerMsg| RX
+    RX -->|Write Telemetry| S2
+    S2 -->|Read Force Feedback<br/>STL Position<br/>STL Orientation| H
+
+    %% =========================
+    %% Shared Memory Flow
+    %% =========================
+    RX -->|Publish Telemetry| STW
+    STW -->|Write| SHM
+    SHM -->|Read| TS
+    TS --> UI
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 3.1 Hardware Loop
 
 The Hardware Loop is responsible for direct communication with the Geomagic Touch device.

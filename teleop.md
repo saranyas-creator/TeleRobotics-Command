@@ -58,55 +58,44 @@ flowchart TB
 
 
 
-
-
 ```mermaid
 flowchart TB
 
-%%=========================
-%% Threads
-%%=========================
 J[Geomagic Touch]
 
-T1["1. Hardware Loop"]
-T2["2. UDP TX Loop"]
-T3["3. UDP RX Loop"]
+subgraph Threads
+direction LR
+TX["UDP TX Loop"]
+HW["Hardware Loop"]
+RX["UDP RX Loop"]
+end
 
-J --> T1
+subgraph Shared_State
+direction LR
+S1["S1<br/>ControllerToRobot"]
+S2["S2<br/>RobotToController"]
+end
 
-T2 --- T1 --- T3
+Robot[Robot]
 
-%%=========================
-%% Shared States
-%%=========================
-S1["S1 : ControllerToRobot<br/>Shared State"]
-S2["S2 : RobotToController<br/>Shared State"]
-
-T1 -->|Write Controller Data| S1
-S1 -->|Read Controller Data| T2
-
-T3 -->|Write Robot Telemetry| S2
-S2 -->|Read Force Feedback<br/>STL Position<br/>STL Orientation| T1
-
-%%=========================
-%% Robot Communication
-%%=========================
-R[Robot]
-
-T2 -->|Raw UDP<br/>ControllerToRobotMsg| R
-R -->|Raw UDP<br/>RobotToControllerMsg| T3
-
-%%=========================
-%% Inter-Process Communication
-%%=========================
-STM["SharedTelemetryWriter"]
 SHM["Shared Memory"]
+
 QT["TelemetryService"]
+
 UI["Qt UI"]
 
-T3 -->|Publish Telemetry| STM
-STM -->|Write| SHM
-SHM -->|Read| QT
+J --> HW
+
+HW -->|Write Controller Data| S1
+S1 -->|Read| TX
+TX -->|ControllerToRobotMsg| Robot
+
+Robot -->|RobotToControllerMsg| RX
+RX -->|Write Telemetry| S2
+S2 -->|Read Force Feedback| HW
+
+RX -->|Publish Telemetry| SHM
+SHM --> QT
 QT --> UI
 ```
 

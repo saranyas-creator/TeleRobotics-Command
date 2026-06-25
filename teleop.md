@@ -60,78 +60,57 @@ flowchart TB
 
 
 
-## 3.1 Hardware Loop
+## 4. Hardware Loop
 
-The Hardware Loop is responsible for direct communication with the Geomagic Touch device.
+The **Hardware Loop** is responsible for direct communication with the **Geomagic Touch** device. It continuously acquires the latest controller state, applies force feedback received from the robot, and updates the **S1 (ControllerToRobot)** shared state for transmission by the UDP TX Loop.
 
-The loop runs continuously at approximately **1 kHz (1 ms period)** and acts as the interface between the physical joystick hardware and the teleoperation software.
-
-```text
-Geomagic Touch
-      │
-      ▼
- Hardware Loop
-      │
-      ▼
- Shared State
-```
-
-### Responsibilities
-
-The Hardware Loop performs the following operations:
-
-* Joystick connection monitoring
-* Joystick initialization
-* Hot-unplug detection
-* Force feedback handling
-* Position acquisition
-* Velocity acquisition
-* Angular velocity acquisition
-* Button state acquisition
-* Shared state updates
-* Watchdog status reporting
+The loop operates at approximately **1 kHz (1 ms period)** to ensure responsive teleoperation.
 
 ---
 
-### Workflow
+### 4.1 Workflow
 
 ```text
 Start Loop
-    │
-    ▼
+      │
+      ▼
 Send Watchdog
-    │
-    ▼
+      │
+      ▼
 Joystick Connected?
-    │
- ┌──┴──┐
- │     │
- No    Yes
- │      │
- ▼      ▼
-Initialize   Check Alive
+      │
+ ┌────┴────┐
+ │         │
+ No       Yes
+ │          │
+ ▼          ▼
+Initialize  Check Alive
                │
                ▼
-         Read Force
+      Read Force Feedback
+          From S2
                │
                ▼
-      Read Joystick Data
+      Read Joystick State
                │
                ▼
-      Update Shared State
+Generate ControllerToRobotMsg
                │
                ▼
-           Sleep 1 ms
+ Update S1 Shared State
                │
                ▼
-          Repeat
+        Sleep (1 ms)
+               │
+               ▼
+            Repeat
 ```
 
 ---
 
-### Watchdog Monitoring
+### 4.2 Watchdog Monitoring
 
-The Hardware Loop periodically sends a watchdog status message to indicate the health of the joystick connection.
+The Hardware Loop periodically sends a watchdog message indicating the current joystick status.
 
 ```json
 {
@@ -144,19 +123,13 @@ The Hardware Loop periodically sends a watchdog status message to indicate the h
 }
 ```
 
-The watchdog is transmitted approximately once every second.
-
-Purpose:
-
-* Report joystick health status
-* Detect hardware failures
-* Inform the UI about device availability
+The watchdog allows the UI to monitor the operational state of the controller.
 
 ---
 
-### Joystick Detection
+### 4.3 Joystick Management
 
-Before initialization, the loop checks whether the Geomagic Touch device is physically connected.
+Before normal operation begins, the Hardware Loop verifies that the Geomagic Touch device is connected and initializes the device.
 
 ```cpp
 if (!isJoystickPluggedIn())
@@ -167,19 +140,6 @@ if (!isJoystickPluggedIn())
 }
 ```
 
-The device is detected using its USB identifier.
-
-Purpose:
-
-* Detect joystick availability
-* Prevent initialization attempts when the device is disconnected
-
----
-
-### Joystick Initialization
-
-When a joystick is detected, the service attempts initialization.
-
 ```cpp
 if (joystick.initialize())
 {
@@ -187,17 +147,7 @@ if (joystick.initialize())
 }
 ```
 
-Purpose:
-
-* Establish communication with the device
-* Initialize the joystick SDK
-* Prepare the hardware for operation
-
----
-
-### Hot-Unplug Detection
-
-During operation, the Hardware Loop continuously verifies that the joystick remains available.
+During operation, the loop continuously monitors the hardware connection.
 
 ```cpp
 if (!joystick.isAlive())
@@ -207,92 +157,59 @@ if (!joystick.isAlive())
 }
 ```
 
-Purpose:
-
-* Detect unexpected device disconnection
-* Safely shut down hardware communication
-* Automatically return to detection mode
+If the joystick is disconnected, the Hardware Loop automatically returns to the detection stage and retries initialization.
 
 ---
 
-### Force Feedback Handling
+### 4.4 Reading Robot Telemetry from S2
 
-The Hardware Loop retrieves the latest force feedback received from the robot.
+The Hardware Loop retrieves the latest telemetry written by the UDP RX Loop into **S2 (RobotToController Shared State)**.
 
 ```cpp
 RobotToControllerMsg latest_force =
     shared_state.getForce();
 ```
 
-Force components:
+The retrieved data includes:
 
 ```text
-Force X
-Force Y
-Force Z
+Force Feedback
+STL Position
+STL Orientation
 ```
 
-These values are intended to be applied to the Geomagic Touch device to generate haptic feedback.
+The force feedback values are used to generate haptic feedback on the Geomagic Touch device.
 
 ---
 
-### Joystick Data Acquisition
+### 4.5 Reading Controller State
 
-The Hardware Loop continuously reads the current joystick state.
-
-#### Position
+The Hardware Loop continuously acquires the current state of the Geomagic Touch device.
 
 ```cpp
-auto pos = joystick.getPosition();
+auto pos     = joystick.getPosition();
+auto vel     = joystick.getVelocity();
+auto ang_vel = joystick.getAngularVelocity();
+int buttons  = joystick.getButtons();
 ```
+
+The acquired controller state consists of:
 
 ```text
-Position X
-Position Y
-Position Z
-```
+Position
 
-#### Velocity
+Velocity
 
-```cpp
-auto vel = joystick.getVelocity();
-```
+Angular Velocity
 
-```text
-Velocity X
-Velocity Y
-Velocity Z
-```
-
-#### Angular Velocity
-
-```cpp
-auto ang_vel =
-    joystick.getAngularVelocity();
-```
-
-```text
-Angular Velocity X
-Angular Velocity Y
-Angular Velocity Z
-```
-
-#### Buttons
-
-```cpp
-int buttons =
-    joystick.getButtons();
-```
-
-```text
 Button States
 ```
 
 ---
 
-### Controller Message Generation
+### 4.6 Generating the Controller Message
 
-The acquired joystick information is packed into a ControllerToRobotMsg structure.
+The acquired controller information is packed into a **ControllerToRobotMsg** structure.
 
 ```cpp
 ControllerToRobotMsg msg{};
@@ -304,7 +221,9 @@ The message contains:
 Sequence Number
 
 Position
+
 Velocity
+
 Angular Velocity
 
 Button States
@@ -315,109 +234,67 @@ Example:
 ```text
 Sequence Number : 150
 
-Position:
+Position
 (0.12, 0.25, 0.08)
 
-Velocity:
+Velocity
 (0.45, 0.10, 0.00)
 
-Buttons:
+Angular Velocity
+(0.03, 0.01, 0.00)
+
+Buttons
 1
 ```
 
 ---
 
-### Shared State Update
+### 4.7 Updating S1 (ControllerToRobot Shared State)
 
-The generated controller message is written into the shared state.
+Once the controller message is generated, it is written into **S1 (ControllerToRobot Shared State)**.
 
 ```cpp
 shared_state.setData(msg);
 ```
 
-Purpose:
-
-* Store the latest joystick state
-* Make data available to the UDP Transmit Loop
-* Decouple hardware access from network transmission
-
-The Hardware Loop does not transmit UDP packets directly.
-
----
-
-### Loop Timing
-
-The Hardware Loop operates at approximately 1 kHz.
-
-```cpp
-std::this_thread::sleep_for(
-    std::chrono::milliseconds(1));
-```
-
-This maintains a loop period of roughly 1 ms.
+S1 acts as the communication bridge between the **Hardware Loop** and the **UDP TX Loop**.
 
 ```text
-1 ms
-  │
-  ▼
-Read Hardware
-  │
-  ▼
-Update State
-  │
-  ▼
-Repeat
+Hardware Loop
+      │
+Generate ControllerToRobotMsg
+      │
+      ▼
+S1 : ControllerToRobot
+      ▲
+Read ControllerToRobotMsg
+      │
+UDP TX Loop
 ```
+
+The Hardware Loop is responsible only for producing the latest controller state. The actual network transmission is performed by the UDP TX Loop.
 
 ---
 
-### Recovery Mechanism
+### 4.8 Recovery Mechanism
 
-The Hardware Loop includes automatic recovery for hardware failures.
-
-#### Device Not Connected
+The Hardware Loop includes automatic recovery to handle hardware failures.
 
 ```text
 Joystick Missing
        │
        ▼
-Wait 1 Second
-       │
-       ▼
 Retry Detection
+       │
+       ▼
+Initialize Device
+       │
+       ▼
+Operational
 ```
 
-#### Initialization Failure
+If the joystick is disconnected during operation, the Hardware Loop safely shuts down the device, resets the connection state, and automatically retries detection and initialization without requiring the application to be restarted.
 
-```text
-Initialization Failed
-          │
-          ▼
-     Wait 1 Second
-          │
-          ▼
-     Retry Initialization
-```
-
-#### Hot-Unplug Event
-
-```text
-Joystick Running
-       │
-       ▼
-Device Unplugged
-       │
-       ▼
-Shutdown Device
-       │
-       ▼
-Reset Connection State
-       │
-       ▼
-Retry Detection
-```
-
-This allows the service to recover automatically without restarting the application.
 
 
 ## 3.2 UDP TX Loop

@@ -60,53 +60,55 @@ flowchart TB
 
 
 
-
 ```mermaid
 flowchart TB
 
-    %% External Components
-    J[Geomagic Touch]
-    R[Robot]
+%%=========================
+%% Threads
+%%=========================
+J[Geomagic Touch]
 
-    %% Threads
-    H["1. Hardware Loop<br/>(Thread)"]
-    TX["2. UDP TX Loop<br/>(Thread)"]
-    RX["3. UDP RX Loop<br/>(Thread)"]
+T1["1. Hardware Loop"]
+T2["2. UDP TX Loop"]
+T3["3. UDP RX Loop"]
 
-    %% Shared States
-    S1["S1 : ControllerToRobot<br/>Shared State"]
-    S2["S2 : RobotToController<br/>Shared State"]
+J --> T1
 
-    %% Shared Memory
-    STW["SharedTelemetryWriter"]
-    SHM["Shared Memory"]
-    TS["TelemetryService"]
-    UI["Qt UI"]
+T2 --- T1 --- T3
 
-    %% Layout
-    J --> H
+%%=========================
+%% Shared States
+%%=========================
+S1["S1 : ControllerToRobot<br/>Shared State"]
+S2["S2 : RobotToController<br/>Shared State"]
 
-    H --- TX
-    H --- RX
+T1 -->|Write Controller Data| S1
+S1 -->|Read Controller Data| T2
 
-    %% Controller Data
-    H -->|Write Controller Data| S1
-    S1 -->|Read Controller Data| TX
-    TX -->|Raw UDP<br/>ControllerToRobotMsg| R
+T3 -->|Write Robot Telemetry| S2
+S2 -->|Read Force Feedback<br/>STL Position<br/>STL Orientation| T1
 
-    %% Robot Telemetry
-    R -->|Raw UDP<br/>RobotToControllerMsg| RX
-    RX -->|Write Robot Telemetry| S2
-    S2 -->|Read Force Feedback<br/>STL Position<br/>STL Orientation| H
+%%=========================
+%% Robot Communication
+%%=========================
+R[Robot]
 
-    %% Shared Memory
-    RX -->|Publish Telemetry| STW
-    STW -->|Write| SHM
-    SHM -->|Read| TS
-    TS --> UI
+T2 -->|Raw UDP<br/>ControllerToRobotMsg| R
+R -->|Raw UDP<br/>RobotToControllerMsg| T3
+
+%%=========================
+%% Inter-Process Communication
+%%=========================
+STM["SharedTelemetryWriter"]
+SHM["Shared Memory"]
+QT["TelemetryService"]
+UI["Qt UI"]
+
+T3 -->|Publish Telemetry| STM
+STM -->|Write| SHM
+SHM -->|Read| QT
+QT --> UI
 ```
-
-
 
 
 

@@ -78,7 +78,6 @@ flowchart TB
 
 The Teleoperation Channel uses two shared state objects for communication between execution threads and one shared memory region for communication with the Qt application.
 
----
 
 ## S1 - ControllerToRobot Shared State
 

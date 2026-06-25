@@ -1,3 +1,21 @@
+# Channel 3 - Teleoperation
+
+# Overview
+
+The Teleoperation Channel is responsible for real-time communication between the Geomagic Touch device and the robot using **Raw UDP** communication.
+
+To achieve low-latency teleoperation, the channel separates hardware interaction, data transmission, and telemetry reception into independent execution threads. Communication between these threads is performed using shared state objects, while telemetry required by the Qt application is exchanged through a shared memory region.
+
+The Teleoperation Channel consists of:
+
+- Three parallel execution threads
+- Two shared state objects for intra-process communication
+- One shared memory region for inter-process communication
+
+---
+
+
+
 ```mermaid
 flowchart TB
 
@@ -57,18 +75,171 @@ flowchart TB
 ```
 
 
+# Thread Communication
 
-
-
-## 4. Hardware Loop
-
-The **Hardware Loop** is responsible for direct communication with the **Geomagic Touch** device. It continuously acquires the latest controller state, applies force feedback received from the robot, and updates the **S1 (ControllerToRobot)** shared state for transmission by the UDP TX Loop.
-
-The loop operates at approximately **1 kHz (1 ms period)** to ensure responsive teleoperation.
+The Teleoperation Channel uses two shared state objects for communication between execution threads and one shared memory region for communication with the Qt application.
 
 ---
 
-### 4.1 Workflow
+## S1 - ControllerToRobot Shared State
+
+The **ControllerToRobot Shared State (S1)** enables communication between the **Hardware Loop** and the **UDP TX Loop**.
+
+The Hardware Loop continuously acquires the latest controller state from the Geomagic Touch device and stores it in S1. The UDP TX Loop reads this information from S1 and transmits it to the robot using Raw UDP communication.
+
+### Data Flow
+
+```text
+Hardware Loop
+      │
+Write Controller Data
+      ▼
+S1 : ControllerToRobot
+      ▲
+Read Controller Data
+      │
+UDP TX Loop
+```
+
+### Written By
+
+- Hardware Loop
+
+### Read By
+
+- UDP TX Loop
+
+### Stored Data
+
+```text
+Sequence Number
+
+Position
+
+Velocity
+
+Angular Velocity
+
+Button States
+```
+
+---
+
+## S2 - RobotToController Shared State
+
+The **RobotToController Shared State (S2)** enables communication between the **UDP RX Loop** and the **Hardware Loop**.
+
+The UDP RX Loop continuously receives robot telemetry and stores it in S2. The Hardware Loop reads this information to obtain the latest force feedback and STL pose information.
+
+### Data Flow
+
+```text
+Robot
+      │
+RobotToControllerMsg
+      ▼
+UDP RX Loop
+      │
+Write Robot Telemetry
+      ▼
+S2 : RobotToController
+      ▲
+Read Force Feedback
+Read STL Position
+Read STL Orientation
+      │
+Hardware Loop
+```
+
+### Written By
+
+- UDP RX Loop
+
+### Read By
+
+- Hardware Loop
+
+### Stored Data
+
+```text
+Force Feedback
+
+STL Position
+
+STL Orientation
+
+Sequence Number
+```
+
+---
+
+## Shared Memory
+
+The Qt application executes in a separate process and therefore cannot directly access **S1** or **S2**.
+
+To enable inter-process communication, the UDP RX Loop publishes the latest robot telemetry into a shared memory region using the **SharedTelemetryWriter**. The Qt application's **TelemetryService** continuously reads this shared memory and provides the telemetry to the user interface.
+
+### Data Flow
+
+```text
+UDP RX Loop
+      │
+      ▼
+SharedTelemetryWriter
+      │
+Write Shared Memory
+      ▼
+Shared Memory
+      ▲
+Read Shared Memory
+      │
+TelemetryService
+      │
+      ▼
+Qt UI
+```
+
+### Written By
+
+- SharedTelemetryWriter (invoked by the UDP RX Loop)
+
+### Read By
+
+- TelemetryService
+
+### Published Data
+
+```text
+Force Feedback
+
+STL Position
+
+STL Orientation
+
+Sequence Number
+
+Timestamp
+```
+
+---
+
+# Thread 1 - Hardware Loop
+
+The **Hardware Loop** is responsible for direct communication with the **Geomagic Touch** device.
+
+It continuously:
+
+- Monitors the joystick connection.
+- Applies force feedback received from **S2 (RobotToController Shared State)**.
+- Reads the latest controller state from the Geomagic Touch device.
+- Generates a **ControllerToRobotMsg**.
+- Updates **S1 (ControllerToRobot Shared State)** for the UDP TX Loop.
+
+The Hardware Loop operates at approximately **1 kHz (1 ms period)**.
+
+---
+
+## 1.1 Workflow
 
 ```text
 Start Loop
@@ -108,7 +279,7 @@ Generate ControllerToRobotMsg
 
 ---
 
-### 4.2 Watchdog Monitoring
+## 1.2 Watchdog Monitoring
 
 The Hardware Loop periodically sends a watchdog message indicating the current joystick status.
 
@@ -123,13 +294,15 @@ The Hardware Loop periodically sends a watchdog message indicating the current j
 }
 ```
 
-The watchdog allows the UI to monitor the operational state of the controller.
+This allows the UI to continuously monitor the operational state of the Geomagic Touch device.
 
 ---
 
-### 4.3 Joystick Management
+## 1.3 Joystick Management
 
-Before normal operation begins, the Hardware Loop verifies that the Geomagic Touch device is connected and initializes the device.
+Before normal operation begins, the Hardware Loop verifies that the Geomagic Touch device is connected and initializes the hardware.
+
+### Joystick Detection
 
 ```cpp
 if (!isJoystickPluggedIn())
@@ -140,6 +313,8 @@ if (!isJoystickPluggedIn())
 }
 ```
 
+### Joystick Initialization
+
 ```cpp
 if (joystick.initialize())
 {
@@ -147,7 +322,7 @@ if (joystick.initialize())
 }
 ```
 
-During operation, the loop continuously monitors the hardware connection.
+### Hot-Unplug Detection
 
 ```cpp
 if (!joystick.isAlive())
@@ -157,11 +332,11 @@ if (!joystick.isAlive())
 }
 ```
 
-If the joystick is disconnected, the Hardware Loop automatically returns to the detection stage and retries initialization.
+If the joystick is disconnected during operation, the Hardware Loop automatically returns to the detection stage and retries initialization.
 
 ---
 
-### 4.4 Reading Robot Telemetry from S2
+## 1.4 Reading Robot Telemetry from S2
 
 The Hardware Loop retrieves the latest telemetry written by the UDP RX Loop into **S2 (RobotToController Shared State)**.
 
@@ -170,21 +345,23 @@ RobotToControllerMsg latest_force =
     shared_state.getForce();
 ```
 
-The retrieved data includes:
+The retrieved telemetry includes:
 
 ```text
 Force Feedback
+
 STL Position
+
 STL Orientation
 ```
 
-The force feedback values are used to generate haptic feedback on the Geomagic Touch device.
+The force feedback values are applied to the Geomagic Touch device to generate haptic feedback.
 
 ---
 
-### 4.5 Reading Controller State
+## 1.5 Reading Controller State
 
-The Hardware Loop continuously acquires the current state of the Geomagic Touch device.
+The Hardware Loop continuously acquires the current controller state.
 
 ```cpp
 auto pos     = joystick.getPosition();
@@ -207,7 +384,7 @@ Button States
 
 ---
 
-### 4.6 Generating the Controller Message
+## 1.6 Generating ControllerToRobot Message
 
 The acquired controller information is packed into a **ControllerToRobotMsg** structure.
 
@@ -215,7 +392,7 @@ The acquired controller information is packed into a **ControllerToRobotMsg** st
 ControllerToRobotMsg msg{};
 ```
 
-The message contains:
+The generated message contains:
 
 ```text
 Sequence Number
@@ -229,35 +406,17 @@ Angular Velocity
 Button States
 ```
 
-Example:
-
-```text
-Sequence Number : 150
-
-Position
-(0.12, 0.25, 0.08)
-
-Velocity
-(0.45, 0.10, 0.00)
-
-Angular Velocity
-(0.03, 0.01, 0.00)
-
-Buttons
-1
-```
-
 ---
 
-### 4.7 Updating S1 (ControllerToRobot Shared State)
+## 1.7 Updating S1 (ControllerToRobot Shared State)
 
-Once the controller message is generated, it is written into **S1 (ControllerToRobot Shared State)**.
+The generated controller message is written into **S1 (ControllerToRobot Shared State)**.
 
 ```cpp
 shared_state.setData(msg);
 ```
 
-S1 acts as the communication bridge between the **Hardware Loop** and the **UDP TX Loop**.
+S1 acts as the communication bridge between the Hardware Loop and the UDP TX Loop.
 
 ```text
 Hardware Loop
@@ -272,11 +431,11 @@ Read ControllerToRobotMsg
 UDP TX Loop
 ```
 
-The Hardware Loop is responsible only for producing the latest controller state. The actual network transmission is performed by the UDP TX Loop.
+The Hardware Loop only updates S1. The UDP TX Loop retrieves the latest controller data from S1 and transmits it to the robot.
 
 ---
 
-### 4.8 Recovery Mechanism
+## 1.8 Recovery Mechanism
 
 The Hardware Loop includes automatic recovery to handle hardware failures.
 
@@ -294,8 +453,6 @@ Operational
 ```
 
 If the joystick is disconnected during operation, the Hardware Loop safely shuts down the device, resets the connection state, and automatically retries detection and initialization without requiring the application to be restarted.
-
-
 
 ## 3.2 UDP TX Loop
 

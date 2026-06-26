@@ -232,3 +232,408 @@ Continue   Wait 5 Seconds
 ```
 
 This retry mechanism allows the Watchdog Worker to recover automatically if the Router Service starts after the Qt application, eliminating the need to restart the application.
+
+---
+
+# 2. Receiving Watchdog Messages
+
+After successful registration, the Watchdog Worker continuously listens for watchdog messages forwarded by the Router Service.
+
+Unlike the registration phase, the worker does not send any further messages. Its primary responsibility is to receive, validate, and process watchdog status information.
+
+Communication flow:
+
+```text
+Robot Watchdog Service
+          │
+          ▼
+     Router Service
+          │
+          ▼
+   Watchdog Worker
+          │
+          ▼
+ Receive WATCHDOG Message
+```
+
+---
+
+## 2.1 Watchdog Message Structure
+
+Each watchdog message consists of two sections:
+
+- **Header**
+  - Identifies the message type.
+- **Payload**
+  - Contains the health status of one or more subsystems.
+
+Example:
+
+```json
+{
+    "type": "WATCHDOG",
+    "payload":
+    {
+        "robot":"on",
+        "joystick":"on",
+        "video_stream":"warning",
+        "internet":"error"
+    }
+}
+```
+
+The worker validates the message type before processing the payload.
+
+---
+
+## 2.2 Receiving the Message
+
+After registration, the worker enters its receive loop.
+
+```cpp
+while (isRunning())
+{
+    ...
+}
+```
+
+Inside the loop, the worker waits for incoming messages using the DEALER socket.
+
+```cpp
+int n = zmq_recv(
+    m_socket,
+    buffer,
+    sizeof(buffer),
+    0);
+```
+
+Workflow:
+
+```text
+Router Service
+       │
+       ▼
+ DEALER Socket
+       │
+       ▼
+   zmq_recv()
+```
+
+Each received message is stored temporarily in a buffer before being parsed.
+
+---
+
+## 2.3 Parsing the JSON Message
+
+The received byte stream is converted into a JSON document.
+
+```cpp
+QByteArray data(buffer, n);
+
+QJsonParseError error;
+
+QJsonDocument document =
+    QJsonDocument::fromJson(data, &error);
+```
+
+If the received data is not valid JSON, the message is ignored.
+
+```cpp
+if (error.error != QJsonParseError::NoError)
+    continue;
+```
+
+This prevents invalid or corrupted messages from being processed.
+
+---
+
+## 2.4 Validating the Message Type
+
+The worker verifies that the received message is a watchdog message.
+
+```cpp
+QJsonObject object =
+    document.object();
+
+if (object["type"].toString() != "WATCHDOG")
+    continue;
+```
+
+Only messages with the type:
+
+```text
+WATCHDOG
+```
+
+are processed.
+
+All other message types are ignored.
+
+---
+
+## 2.5 Extracting the Payload
+
+Once the message has been validated, the worker extracts the payload containing subsystem status information.
+
+```cpp
+QJsonObject payload =
+    object["payload"].toObject();
+```
+
+Example payload:
+
+```json
+{
+    "robot":"on",
+    "joystick":"error",
+    "video_stream":"warning",
+    "internet":"disconnected"
+}
+```
+
+Each entry represents the current state of a subsystem.
+
+---
+
+## 2.6 Converting to QVariantMap
+
+The payload is converted into a `QVariantMap`.
+
+```cpp
+QVariantMap map;
+
+for (auto it = payload.begin();
+     it != payload.end();
+     ++it)
+{
+    map[it.key()] =
+        it.value().toVariant();
+}
+```
+
+Example conversion:
+
+```text
+JSON Payload
+
+robot            on
+joystick         error
+video_stream     warning
+
+        │
+        ▼
+
+QVariantMap
+
+robot            → on
+joystick         → error
+video_stream     → warning
+```
+
+The `QVariantMap` provides a convenient format for passing subsystem status information throughout the Qt application.
+
+---
+
+# 3. Subsystem Status Monitoring
+
+The Watchdog Worker does not contain dedicated logic for individual subsystems. Instead, it processes every key-value pair present in the received payload.
+
+This allows new subsystems to be added without modifying the worker implementation.
+
+Typical subsystems include:
+
+- Robot
+- Joystick
+- Video Stream
+- Force Sensor
+- Internet
+- Camera
+- RealSense
+
+Example:
+
+```json
+{
+    "robot":"on",
+    "joystick":"on",
+    "force_sensor":"warning",
+    "internet":"error"
+}
+```
+
+Each subsystem is forwarded to the Qt application exactly as received.
+
+---
+
+## 3.1 Supported Status Values
+
+The Robot Software reports subsystem health using standardized status values.
+
+| Status | Description |
+|---------|-------------|
+| **on** | Component is operating normally |
+| **off** | Component is detected but inactive |
+| **warning** | Component is operating with a non-critical issue |
+| **error** | Component has encountered an error |
+| **disconnected** | Component is unavailable |
+| **initializing** | Component is starting or calibrating |
+
+The Watchdog Worker does not interpret these values. It simply forwards them to the Qt application.
+
+---
+
+## 3.2 System State Monitoring
+
+In addition to subsystem health, the robot may report its overall operating state.
+
+Typical system states include:
+
+| State | Description |
+|--------|-------------|
+| **IDLE** | System is powered but idle |
+| **READY** | System is ready for operation |
+| **EXECUTE** | System is currently executing a task |
+| **ERROR** | System fault detected |
+
+The system state is treated like any other payload field and forwarded to the Qt application.
+---
+
+# 4. Forwarding Status to the Qt Application
+
+After processing the watchdog message, the Watchdog Worker forwards the subsystem status to the Qt application.
+
+The parsed subsystem information is emitted through the `statusReceived()` signal.
+
+```cpp
+emit statusReceived(map);
+```
+
+The emitted `QVariantMap` contains the latest status of every subsystem received from the Robot Software.
+
+Example:
+
+```text
+robot          → on
+
+joystick       → error
+
+video_stream   → warning
+
+internet       → disconnected
+```
+
+The Watchdog Worker does not modify or interpret these values. It simply forwards them to the Qt application.
+
+Communication flow:
+
+```text
+WATCHDOG JSON
+       │
+       ▼
+ Parse JSON
+       │
+       ▼
+Extract Payload
+       │
+       ▼
+Create QVariantMap
+       │
+       ▼
+emit statusReceived(map)
+       │
+       ▼
+Qt Application
+```
+
+---
+
+## 4.1 Updating the User Interface
+
+The Qt application receives the emitted `QVariantMap` and updates the corresponding watchdog indicators.
+
+Each subsystem status is mapped to its respective UI element.
+
+Example:
+
+```text
+robot          → Robot Indicator
+
+joystick       → Joystick Indicator
+
+video_stream   → Video Stream Indicator
+
+internet       → Internet Indicator
+```
+
+The presentation of each status, including colours or icons, is handled by the user interface.
+
+This separation keeps the Watchdog Worker independent of the visualization layer.
+
+---
+
+# 5. Overall Workflow
+
+The complete execution flow of the Watchdog Worker is shown below.
+
+```text
+Qt Application
+        │
+        ▼
+Create Watchdog Worker
+        │
+        ▼
+Read Configuration
+        │
+        ▼
+Create DEALER Socket
+        │
+        ▼
+Connect to Router
+        │
+        ▼
+Register as UI_WATCHDOG
+        │
+        ▼
+Receive REGISTER_ACK
+        │
+        ▼
+Wait for WATCHDOG Messages
+        │
+        ▼
+Receive JSON Message
+        │
+        ▼
+Validate Message Type
+        │
+        ▼
+Extract Payload
+        │
+        ▼
+Create QVariantMap
+        │
+        ▼
+Emit statusReceived()
+        │
+        ▼
+Qt Application
+        │
+        ▼
+Update Watchdog Indicators
+```
+
+---
+
+# Summary
+
+The Watchdog Worker provides the communication interface for receiving subsystem health information from the Robot Software.
+
+Its responsibilities include:
+
+- Registering with the Router Service.
+- Receiving watchdog JSON messages.
+- Validating the received messages.
+- Parsing subsystem status information.
+- Converting the payload into a `QVariantMap`.
+- Forwarding the parsed status to the Qt application.
+
+By separating communication from visualization, the Watchdog Worker remains focused on message handling, while the Qt application is responsible for presenting the subsystem status to the operator.

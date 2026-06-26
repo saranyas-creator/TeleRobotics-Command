@@ -467,18 +467,18 @@ Each subsystem is forwarded to the Qt application exactly as received.
 
 ## 3.1 Supported Status Values
 
-The Robot Software reports subsystem health using standardized status values.
+Each subsystem reports its operational state using one of the predefined status values.
 
-| Status | Description |
-|---------|-------------|
-| **on** | Component is operating normally |
-| **off** | Component is detected but inactive |
-| **warning** | Component is operating with a non-critical issue |
-| **error** | Component has encountered an error |
-| **disconnected** | Component is unavailable |
-| **initializing** | Component is starting or calibrating |
+The Watchdog Worker forwards these values to the Qt application without modification. The Qt application interprets each status and updates the corresponding watchdog indicator.
 
-The Watchdog Worker does not interpret these values. It simply forwards them to the Qt application.
+| Status | Description | UI Indicator |
+|---------|-------------|--------------|
+| **on** | Component is operating normally | 🟢 Green |
+| **off** | Component is detected but inactive | 🟠 Orange |
+| **warning** | Component is operating with a non-critical issue | 🟡 Yellow |
+| **error** | Component failure detected | 🔴 Red |
+| **disconnected** | Component unavailable or connection lost | ⚫ Gray / Black |
+| **initializing** | Component is starting or calibrating | 🔵 Blue |
 
 ---
 
@@ -498,9 +498,11 @@ Typical system states include:
 The system state is treated like any other payload field and forwarded to the Qt application.
 ---
 
+---
+
 # 4. Forwarding Status to the Qt Application
 
-After processing the watchdog message, the Watchdog Worker forwards the subsystem status to the Qt application.
+After processing the received watchdog message, the Watchdog Worker forwards the subsystem status to the Qt application.
 
 The parsed subsystem information is emitted through the `statusReceived()` signal.
 
@@ -508,7 +510,7 @@ The parsed subsystem information is emitted through the `statusReceived()` signa
 emit statusReceived(map);
 ```
 
-The emitted `QVariantMap` contains the latest status of every subsystem received from the Robot Software.
+The emitted `QVariantMap` contains the latest status of all monitored subsystems.
 
 Example:
 
@@ -520,9 +522,9 @@ joystick       → error
 video_stream   → warning
 
 internet       → disconnected
-```
 
-The Watchdog Worker does not modify or interpret these values. It simply forwards them to the Qt application.
+force_sensor   → initializing
+```
 
 Communication flow:
 
@@ -545,59 +547,9 @@ emit statusReceived(map)
 Qt Application
 ```
 
----
+The Qt application receives the emitted status information and updates the corresponding watchdog indicators.
 
-## 4.1 Updating the User Interface
-
-The Qt application receives the emitted `QVariantMap` and updates the corresponding watchdog indicators.
-
-Each subsystem status is mapped to its respective UI element.
-
-Example:
-
-```text
-robot          → Robot Indicator
-
-joystick       → Joystick Indicator
-
-video_stream   → Video Stream Indicator
-
-internet       → Internet Indicator
-```
-
-The presentation of each status, including colours or icons, is handled by the user interface.
-
-This separation keeps the Watchdog Worker independent of the visualization layer.
-
----
-
-## 4.2 Watchdog Status Indicators
-
-The Qt application uses the received subsystem status to update the corresponding watchdog indicator.
-
-Each status value is mapped to a predefined visual indicator, allowing the operator to quickly identify the health of each subsystem.
-
-| Status | Description | UI Indicator |
-|---------|-------------|--------------|
-| **on** | Component is operating normally | 🟢 Green |
-| **off** | Component is detected but inactive | 🟠 Orange |
-| **warning** | Component is operating with a non-critical issue | 🟡 Yellow |
-| **error** | Component failure detected | 🔴 Red |
-| **disconnected** | Component unavailable or connection lost | ⚫ Gray / Black |
-| **initializing** | Component is starting or calibrating | 🔵 Blue |
-
-Example:
-
-| Subsystem | Received Status | UI Indicator |
-|-----------|-----------------|--------------|
-| Robot | on | 🟢 Green |
-| Joystick | error | 🔴 Red |
-| Video Stream | warning | 🟡 Yellow |
-| Internet | disconnected | ⚫ Gray |
-| Force Sensor | initializing | 🔵 Blue |
-
-The Watchdog Worker forwards the received status values without modification. The Qt application interprets these values and updates the corresponding watchdog indicators.
-
+Since the Watchdog Worker is responsible only for communication and message processing, it does not perform any user interface updates. This separation keeps the communication layer independent of the presentation layer and allows the UI to determine how subsystem status is visually represented.
 
 ---
 
@@ -606,19 +558,19 @@ The Watchdog Worker forwards the received status values without modification. Th
 The complete execution flow of the Watchdog Worker is shown below.
 
 ```text
-Qt Application
-        │
-        ▼
 Create Watchdog Worker
         │
         ▼
 Read Configuration
         │
         ▼
+Create ZeroMQ Context
+        │
+        ▼
 Create DEALER Socket
         │
         ▼
-Connect to Router
+Connect to Router Service
         │
         ▼
 Register as UI_WATCHDOG
@@ -657,13 +609,15 @@ Update Watchdog Indicators
 
 The Watchdog Worker provides the communication interface for receiving subsystem health information from the Robot Software.
 
-Its responsibilities include:
+Its primary responsibilities include:
 
 - Registering with the Router Service.
 - Receiving watchdog JSON messages.
-- Validating the received messages.
-- Parsing subsystem status information.
+- Validating and parsing the received messages.
+- Extracting subsystem status information.
 - Converting the payload into a `QVariantMap`.
 - Forwarding the parsed status to the Qt application.
 
-By separating communication from visualization, the Watchdog Worker remains focused on message handling, while the Qt application is responsible for presenting the subsystem status to the operator.
+The worker is responsible only for communication and message processing. The visualization of subsystem status is handled independently by the Qt user interface.
+
+ker remains focused on message handling, while the Qt application is responsible for presenting the subsystem status to the operator.

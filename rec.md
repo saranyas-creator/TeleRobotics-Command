@@ -571,6 +571,36 @@ This separation keeps the Watchdog Worker independent of the visualization layer
 
 ---
 
+## 4.2 Watchdog Status Indicators
+
+The Qt application uses the received subsystem status to update the corresponding watchdog indicator.
+
+Each status value is mapped to a predefined visual indicator, allowing the operator to quickly identify the health of each subsystem.
+
+| Status | Description | UI Indicator |
+|---------|-------------|--------------|
+| **on** | Component is operating normally | 🟢 Green |
+| **off** | Component is detected but inactive | 🟠 Orange |
+| **warning** | Component is operating with a non-critical issue | 🟡 Yellow |
+| **error** | Component failure detected | 🔴 Red |
+| **disconnected** | Component unavailable or connection lost | ⚫ Gray / Black |
+| **initializing** | Component is starting or calibrating | 🔵 Blue |
+
+Example:
+
+| Subsystem | Received Status | UI Indicator |
+|-----------|-----------------|--------------|
+| Robot | on | 🟢 Green |
+| Joystick | error | 🔴 Red |
+| Video Stream | warning | 🟡 Yellow |
+| Internet | disconnected | ⚫ Gray |
+| Force Sensor | initializing | 🔵 Blue |
+
+The Watchdog Worker forwards the received status values without modification. The Qt application interprets these values and updates the corresponding watchdog indicators.
+
+
+---
+
 # 5. Overall Workflow
 
 The complete execution flow of the Watchdog Worker is shown below.

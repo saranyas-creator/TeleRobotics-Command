@@ -1,4 +1,3 @@
-
 # Camera Worker
 
 ## Overview

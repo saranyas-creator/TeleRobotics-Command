@@ -540,8 +540,6 @@ Typical system states include:
 The system state is treated like any other payload field and forwarded to the Qt application.
 ---
 
----
-
 # 4. Forwarding Status to the Qt Application
 
 After processing the received watchdog message, the Watchdog Worker forwards the subsystem status to the Qt application.

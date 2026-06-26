@@ -538,6 +538,7 @@ Typical system states include:
 | **ERROR** | System fault detected |
 
 The system state is treated like any other payload field and forwarded to the Qt application.
+
 ---
 
 # 4. Forwarding Status to the Qt Application

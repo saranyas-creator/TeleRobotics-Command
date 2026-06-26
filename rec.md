@@ -2,45 +2,87 @@
 
 ## Overview
 
-The **Watchdog Worker** is responsible for receiving real-time health and status information from the Robot Software through the Router Service.
+The **Watchdog Worker** is responsible for receiving the real-time health and operational status of the robot and its associated subsystems.
 
-It inherits from **ZmqWorkerBase** and runs in its own worker thread managed by the **ZmqManager**. After registering with the Router Service, the worker continuously listens for watchdog messages, extracts subsystem status information, and forwards it to the Qt application.
+The worker runs in its own thread and is managed by the **ZmqManager**. It communicates with the Router Service through a **ZeroMQ DEALER** socket. After registering as **UI_WATCHDOG**, it continuously receives watchdog messages, extracts subsystem status information, and forwards the processed data to the Qt application.
 
-Unlike the Command Worker, the Watchdog Worker does not send operational commands to the robot. Its only outgoing communication is the initial registration request with the Router Service. All subsequent communication consists of receiving watchdog status updates.
+Unlike the Command Worker, the Watchdog Worker does not send operational commands to the robot. Its only outgoing communication is the initial registration request with the Router Service. Once registration is complete, the worker only receives watchdog status messages.
 
 ### Responsibilities
 
 - Register with the Router Service as **UI_WATCHDOG**
 - Receive watchdog status messages
-- Parse incoming JSON data
+- Parse the received JSON data
 - Extract subsystem health information
-- Forward status information to the Qt application
+- Forward subsystem status to the Qt application
 
 ---
 
 # Architecture
 
-The Watchdog Worker acts as the communication interface between the Router Service and the Qt user interface.
+The following diagram illustrates how the Watchdog Worker is organized within the Qt application.
 
 ```text
-               Qt Application
-                      │
-                      ▼
-                 ZmqManager
-                      │
-                      ▼
-               Watchdog Worker
-                      │
-             ZeroMQ DEALER Socket
-                      │
-                      ▼
-                Router Service
-                      │
-                      ▼
-          Robot Watchdog Service
+                Qt Application
+                       │
+        ┌──────────────┴──────────────┐
+        │                             │
+        ▼                             ▼
+   ZmqManager                  Status Widget
+        │                             ▲
+        ▼                             │
+ Watchdog Worker ─────────────────────┘
 ```
 
-The worker receives all watchdog messages through the Router Service and forwards the processed subsystem status to the Qt application.
+Component responsibilities:
+
+- **ZmqManager**
+  - Creates and manages the Watchdog Worker.
+  - Starts and stops the worker thread during the application lifecycle.
+
+- **Watchdog Worker**
+  - Handles all watchdog communication.
+  - Receives and processes watchdog messages.
+  - Emits subsystem status information to the Qt application.
+
+- **Status Widget**
+  - Receives subsystem status updates from the Watchdog Worker.
+  - Updates the corresponding watchdog indicators displayed in the user interface.
+
+---
+
+# Communication Flow
+
+The Watchdog Worker receives subsystem status information from the Robot Watchdog Service through the Router Service.
+
+```text
+Robot Watchdog Service
+          │
+          ▼
+     Router Service
+          │
+          ▼
+UI_WATCHDOG (DEALER)
+          │
+          ▼
+   Watchdog Worker
+          │
+          ▼
+ statusReceived()
+          │
+          ▼
+   Status Widget
+```
+
+The communication sequence is as follows:
+
+1. The Robot Watchdog Service periodically generates subsystem health information.
+2. The Router Service forwards the watchdog message to the registered **UI_WATCHDOG** client.
+3. The Watchdog Worker receives and processes the message.
+4. The processed subsystem status is emitted to the Qt application.
+5. The Status Widget updates the corresponding watchdog indicators.
+
+The Watchdog Worker acts only as the communication and processing layer. It does not determine how subsystem status is visually represented in the user interface.
 
 ---
 

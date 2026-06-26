@@ -576,7 +576,243 @@ The emitted `QVariantMap` contains the latest status of every subsystem reported
 
 The Qt application receives this information and updates the corresponding status indicators.
 
+---
 
+# 4. Updating the Qt Application
+
+After processing the watchdog message, the Watchdog Worker forwards the subsystem status to the Qt application.
+
+The worker does not directly update the user interface. Instead, it emits the parsed status information through a Qt signal.
+
+```cpp
+emit statusReceived(map);
+```
+
+Communication flow:
+
+```text
+Watchdog Worker
+        │
+        ▼
+statusReceived(QVariantMap)
+        │
+        ▼
+Qt Status Widget
+        │
+        ▼
+Update Watchdog Indicators
+```
+
+This design separates the communication layer from the user interface, allowing the worker to remain independent of any UI implementation.
+
+---
+
+## 4.1 Status Indicator Updates
+
+The Qt application receives the emitted `QVariantMap` and updates the corresponding watchdog indicators.
+
+Each subsystem is identified using its key.
+
+Example:
+
+```text
+robot          → on
+
+joystick       → error
+
+video_stream   → warning
+
+internet       → disconnected
+```
+
+The UI updates only the corresponding subsystem indicator without affecting the remaining indicators.
+
+Example:
+
+```text
+Robot          🟢
+
+Joystick       🔴
+
+Video Stream   🟡
+
+Internet       ⚫
+```
+
+---
+
+## 4.2 Status Colour Mapping
+
+The Watchdog Worker forwards only the subsystem status values.
+
+The Qt application maps each status to a visual indicator.
+
+| Status | Meaning | Indicator |
+|---------|---------|-----------|
+| **on** | Operating normally | 🟢 Green |
+| **off** | Detected but inactive | 🟠 Orange |
+| **warning** | Operating with a non-critical issue | 🟡 Yellow |
+| **error** | Component failure | 🔴 Red |
+| **disconnected** | Device unavailable | ⚫ Gray / Black |
+| **initializing** | Starting or calibrating | 🔵 Blue |
+
+This mapping provides a consistent visual representation of the system health.
+
+---
+
+## 4.3 Example
+
+Received watchdog message:
+
+```json
+{
+    "type":"WATCHDOG",
+    "payload":
+    {
+        "robot":"on",
+        "joystick":"error",
+        "video_stream":"warning",
+        "internet":"disconnected"
+    }
+}
+```
+
+After parsing, the Watchdog Worker emits:
+
+```text
+robot          → on
+
+joystick       → error
+
+video_stream   → warning
+
+internet       → disconnected
+```
+
+The Qt UI displays:
+
+```text
+Robot          🟢 Green
+
+Joystick       🔴 Red
+
+Video Stream   🟡 Yellow
+
+Internet       ⚫ Gray
+```
+
+---
+
+# 5. Overall Communication Flow
+
+The complete execution flow of the Watchdog Worker is shown below.
+
+```text
+Qt Application
+        │
+        ▼
+Create Watchdog Worker
+        │
+        ▼
+Read Configuration
+        │
+        ▼
+Create DEALER Socket
+        │
+        ▼
+Connect to Router
+        │
+        ▼
+Register as UI_WATCHDOG
+        │
+        ▼
+Receive REGISTER_ACK
+        │
+        ▼
+Wait for WATCHDOG Messages
+        │
+        ▼
+Receive JSON Message
+        │
+        ▼
+Validate Message Type
+        │
+        ▼
+Extract Payload
+        │
+        ▼
+Create QVariantMap
+        │
+        ▼
+Emit statusReceived()
+        │
+        ▼
+Qt Status Widget
+        │
+        ▼
+Update Watchdog Indicators
+```
+
+---
+
+# 6. End-to-End Communication Flow
+
+The following diagram illustrates the complete watchdog communication from the robot to the Qt user interface.
+
+```text
+Robot Software
+        │
+Generate Watchdog Status
+        │
+        ▼
+Create WATCHDOG JSON
+        │
+        ▼
+Robot DEALER Socket
+        │
+        ▼
+Router Service
+        │
+        ▼
+UI_WATCHDOG DEALER
+        │
+        ▼
+Watchdog Worker
+        │
+        ▼
+Parse JSON
+        │
+        ▼
+Extract Payload
+        │
+        ▼
+Create QVariantMap
+        │
+        ▼
+Emit statusReceived()
+        │
+        ▼
+Qt Status Widget
+        │
+        ▼
+Update Status Indicators
+```
+
+---
+
+# Summary
+
+The Watchdog Worker is responsible for receiving and processing subsystem health information from the Robot Software.
+
+Its responsibilities include:
+
+- Registering with the Router Service.
+- Receiving watchdog JSON messages.
+- Parsing the received payload.
+- Extracting subsystem status information.
+- Forwarding subsystem status to the Qt application.
+
+The worker remains independent of the user interface by emitting the parsed status through Qt signals. The Qt application is responsible for interpreting these status values and updating the corresponding watchdog indicators, providing the operator with a real-time view of the robot and subsystem health.
 
 
 

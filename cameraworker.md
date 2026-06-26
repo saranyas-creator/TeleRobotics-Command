@@ -256,5 +256,577 @@ UI_CAMERA Publisher
         ▼
  Camera Worker
 ```
+---
 
+# 3. Connecting to the Publisher
+
+After creating the SUB socket, the Camera Worker connects to the camera publisher exposed by the Software Services.
+
+```cpp
+if (zmq_connect(m_socket, endpoint.constData()) != 0)
+{
+    emitError("Camera worker zmq_connect failed");
+    stop();
+    return;
+}
+```
+
+The connection endpoint is configured as:
+
+```text
+tcp://<Host>:<PubPort>
+```
+
+For example,
+
+```text
+tcp://127.0.0.1:5558
+```
+
+Communication flow:
+
+```text
+Software Services
+        │
+        ▼
+UI_CAMERA Publisher
+        │
+tcp://127.0.0.1:5558
+        │
+        ▼
+Camera Worker
+```
+
+Once the connection is established, the Camera Worker is ready to subscribe to camera topics.
+
+---
+
+# 4. Topic Subscription
+
+The Camera Worker subscribes to the base camera topic.
+
+```cpp
+zmq_setsockopt(
+    m_socket,
+    ZMQ_SUBSCRIBE,
+    kTopicBase,
+    strlen(kTopicBase));
+```
+
+The subscribed topic is
+
+```text
+camera.frame.
+```
+
+Each published frame contains a topic in the following format.
+
+```text
+camera.frame.<trackId>
+```
+
+Example:
+
+```text
+camera.frame.track_01
+
+camera.frame.track_02
+
+camera.frame.track_03
+```
+
+By subscribing to the base topic `camera.frame.`, the Camera Worker automatically receives frames from all active camera tracks without subscribing to each track individually.
+
+---
+
+# 5. Preparing for Frame Reception
+
+After connecting and subscribing, the Camera Worker prepares to receive incoming frames asynchronously.
+
+The worker configures a receive timeout for the SUB socket.
+
+```cpp
+int timeout = kRecvTimeoutMs;
+
+zmq_setsockopt(
+    m_socket,
+    ZMQ_RCVTIMEO,
+    &timeout,
+    sizeof(timeout));
+```
+
+The worker is then marked as running.
+
+```cpp
+setRunning(true);
+```
+
+Next, the ZeroMQ socket file descriptor is obtained.
+
+```cpp
+int fd;
+
+size_t fd_len = sizeof(fd);
+
+zmq_getsockopt(
+    m_socket,
+    ZMQ_FD,
+    &fd,
+    &fd_len);
+```
+
+This file descriptor is used to monitor incoming data without blocking the Qt event loop.
+
+---
+
+# 6. Asynchronous Frame Reception
+
+The Camera Worker creates a `QSocketNotifier` to monitor the ZeroMQ socket.
+
+```cpp
+m_notifier =
+    new QSocketNotifier(
+        fd,
+        QSocketNotifier::Read,
+        this);
+
+connect(
+    m_notifier,
+    &QSocketNotifier::activated,
+    this,
+    &ZMQCameraWorker::handleReadyRead);
+```
+
+The notifier continuously watches the socket.
+
+Whenever a new frame arrives, Qt automatically invokes the `handleReadyRead()` function.
+
+Communication flow:
+
+```text
+ZeroMQ Publisher
+        │
+        ▼
+ ZeroMQ SUB Socket
+        │
+        ▼
+ QSocketNotifier
+        │
+        ▼
+handleReadyRead()
+```
+
+Using `QSocketNotifier` allows the worker to receive camera frames asynchronously without polling or blocking the application.
+
+---
+
+# 7. Receiving Camera Frames
+
+The `handleReadyRead()` function is responsible for receiving incoming camera messages.
+
+```cpp
+void ZMQCameraWorker::handleReadyRead()
+```
+
+Whenever the SUB socket becomes readable, this function executes.
+
+Workflow:
+
+```text
+Socket Ready
+      │
+      ▼
+Receive Message
+      │
+      ▼
+Extract Envelope
+      │
+      ▼
+Process Envelope
+```
+
+Inside the function, the worker continuously reads all available messages.
+
+```cpp
+while (true)
+{
+    zmq_msg_t msg;
+
+    zmq_msg_init(&msg);
+
+    int n =
+        zmq_msg_recv(
+            &msg,
+            m_socket,
+            ZMQ_DONTWAIT);
+
+    ...
+}
+```
+
+Each received message is stored as a ZeroMQ message object.
+
+---
+
+# 8. Reading the Frame Envelope
+
+After a message is successfully received, the ZeroMQ message is converted into a `QByteArray`.
+
+```cpp
+QByteArray data(
+    static_cast<char*>(zmq_msg_data(&msg)),
+    zmq_msg_size(&msg));
+```
+
+The ZeroMQ message is then released.
+
+```cpp
+zmq_msg_close(&msg);
+```
+
+Finally, the received frame envelope is forwarded to the frame parser.
+
+```cpp
+handleFrameEnvelope(data);
+```
+
+Communication flow:
+
+```text
+ZeroMQ Message
+       │
+       ▼
+QByteArray
+       │
+       ▼
+handleFrameEnvelope()
+```
+
+At this stage, the Camera Worker has successfully received a complete camera message from the publisher.
+
+The next stage is to extract the topic, track identifier, and RGB image data from the received frame envelope.
+---
+
+# 9. Frame Processing
+
+After receiving a complete ZeroMQ message, the Camera Worker forwards the message to the `handleFrameEnvelope()` function for processing.
+
+```cpp
+handleFrameEnvelope(data);
+```
+
+The purpose of this function is to:
+
+- Extract the topic
+- Identify the video track
+- Extract the RGB image payload
+- Validate the received frame
+- Convert the image into a `QImage`
+- Emit the frame to the Qt application
+
+The overall processing workflow is shown below.
+
+```text
+Received Message
+        │
+        ▼
+Extract Topic
+        │
+        ▼
+Extract Track ID
+        │
+        ▼
+Extract RGB Payload
+        │
+        ▼
+Validate Frame
+        │
+        ▼
+Create QImage
+        │
+        ▼
+Emit Frame
+```
+
+---
+
+# 9.1 Verifying the Camera Topic
+
+The Camera Worker first verifies that the received message belongs to the subscribed camera topic.
+
+```cpp
+const QByteArray topicPrefix(kTopicBase);
+
+if (!envelope.startsWith(topicPrefix))
+{
+    return;
+}
+```
+
+The expected topic format is
+
+```text
+camera.frame.<trackId>
+```
+
+Only messages beginning with this topic prefix are processed further.
+
+Messages belonging to other topics are ignored.
+
+---
+
+# 9.2 Extracting the Track Identifier
+
+Each published frame contains a unique track identifier.
+
+The Camera Worker extracts this identifier from the received topic.
+
+```cpp
+QString trackId =
+    QString::fromUtf8(
+        envelope.mid(
+            topicPrefix.size(),
+            spaceIdx - topicPrefix.size()));
+```
+
+Example:
+
+```text
+Topic
+
+camera.frame.track_01
+```
+
+Extracted Track ID
+
+```text
+track_01
+```
+
+The track identifier allows the Qt application to distinguish between multiple active camera streams.
+
+---
+
+# 9.3 Extracting the Image Payload
+
+After extracting the topic, the remaining message contains the RGB image data.
+
+```cpp
+const QByteArray payload =
+    envelope.mid(spaceIdx + 1);
+```
+
+Communication flow:
+
+```text
+ZeroMQ Message
+      │
+      ▼
+Topic + RGB Payload
+      │
+      ├────────► Topic
+      │
+      └────────► RGB Image
+```
+
+The payload contains the raw RGB pixel values received from the Software Services.
+
+---
+
+# 10. Frame Validation
+
+Before creating the image, the Camera Worker verifies that the received payload size matches the expected image dimensions.
+
+```cpp
+int expectedWidth  = 640;
+int expectedHeight = 480;
+
+int expectedBytes =
+    expectedWidth *
+    expectedHeight *
+    3;
+```
+
+For an RGB image,
+
+```text
+Width  = 640 pixels
+
+Height = 480 pixels
+
+Channels = 3 (RGB)
+
+Total Bytes
+
+640 × 480 × 3
+
+=
+
+921600 Bytes
+```
+
+The payload is validated as follows.
+
+```cpp
+if (payload.size() != expectedBytes)
+{
+    return;
+}
+```
+
+Only complete image frames are processed further.
+
+Invalid or incomplete frames are discarded.
+
+---
+
+# 11. QImage Generation
+
+Once the payload has been validated, the Camera Worker creates a `QImage`.
+
+```cpp
+QImage frame(
+    reinterpret_cast<const uchar*>(payload.constData()),
+    expectedWidth,
+    expectedHeight,
+    expectedWidth * 3,
+    QImage::Format_RGB888);
+```
+
+The image is created using:
+
+| Parameter | Description |
+|-----------|-------------|
+| Width | 640 pixels |
+| Height | 480 pixels |
+| Bytes Per Line | Width × 3 |
+| Format | RGB888 |
+
+Communication flow:
+
+```text
+RGB Payload
+      │
+      ▼
+QImage
+```
+
+If the image creation fails,
+
+```cpp
+if (frame.isNull())
+{
+    return;
+}
+```
+
+the frame is discarded.
+
+---
+
+# 12. Delivering Frames to the Qt Application
+
+After successfully creating the `QImage`, the Camera Worker emits the image to the Qt application.
+
+```cpp
+emit newFrame(
+    trackId,
+    frame.copy());
+```
+
+The emitted signal contains:
+
+- Track Identifier
+- RGB Image
+
+Communication flow:
+
+```text
+Camera Worker
+       │
+       ▼
+newFrame(trackId, QImage)
+       │
+       ▼
+Qt Camera Widget
+       │
+       ▼
+Display Image
+```
+
+The Qt Camera Widget receives the signal and updates the displayed camera frame.
+
+---
+
+# 13. Overall Workflow
+
+The complete execution flow of the Camera Worker is shown below.
+
+```text
+Create Worker
+       │
+       ▼
+Read Configuration
+       │
+       ▼
+Create ZMQ Context
+       │
+       ▼
+Create SUB Socket
+       │
+       ▼
+Subscribe Topic
+       │
+       ▼
+Connect Publisher
+       │
+       ▼
+Wait for Camera Frames
+       │
+       ▼
+Receive ZeroMQ Message
+       │
+       ▼
+Extract Topic
+       │
+       ▼
+Extract Track ID
+       │
+       ▼
+Extract RGB Payload
+       │
+       ▼
+Validate Payload
+       │
+       ▼
+Create QImage
+       │
+       ▼
+Emit newFrame()
+       │
+       ▼
+Qt Camera Widget
+       │
+       ▼
+Display Camera Frame
+```
+
+---
+
+# Summary
+
+The Camera Worker provides the communication bridge between the Software Services and the Qt application.
+
+Its responsibilities include:
+
+- Connecting to the camera publisher
+- Subscribing to camera topics
+- Receiving RGB image frames
+- Extracting the track identifier
+- Validating the received image
+- Converting the image into a `QImage`
+- Delivering the image to the Qt user interface
+
+By separating camera reception into its own worker thread, image acquisition remains asynchronous and independent of the main Qt user interface, ensuring smooth and responsive video display.
 At this point, the Camera Worker is ready to subscribe to camera topics and receive incoming image frames.
+

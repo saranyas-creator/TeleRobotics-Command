@@ -622,3 +622,5 @@ Its primary responsibilities include:
 - Forwarding the processed image to the Qt application.
 
 The Camera Worker is responsible for communication and image processing only. Displaying the received image is handled by the Qt application, allowing the communication layer and user interface to remain independent.
+
+

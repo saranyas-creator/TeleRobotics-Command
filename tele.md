@@ -1,6 +1,6 @@
 # Communication Framework
 
-## Overview
+## 1. Overview
 
 The **Communication Framework** provides the communication layer between the Qt application and the Software Services. It enables the application to exchange commands, camera frames, watchdog status, and robot telemetry while maintaining a responsive user interface.
 
@@ -15,36 +15,37 @@ This separation allows each communication mechanism to be optimized for its spec
 
 ---
 
-# Architecture
+# 2. Architecture
 
 The Communication Framework consists of two independent communication layers.
 
 ```text
                     Qt Application
                            │
-        ┌──────────────────┴──────────────────┐
-        │                                     │
-        ▼                                     ▼
- Communication Framework            TelemetryService
-        │                                     │
-        ▼                                     ▼
-   ZmqManager                          Shared Memory
-        │
-        ▼
-  ZmqWorkerBase
-        │
- ┌──────┼──────────────┐
- ▼      ▼              ▼
+                           ▼
+               Communication Framework
+          ┌────────────────┴────────────────┐
+          ▼                                 ▼
+     ZeroMQ Layer                  Shared Memory Layer
+          │                                 │
+          ▼                                 ▼
+     ZmqManager                    TelemetryService
+          │                                 │
+          ▼                                 ▼
+    ZmqWorkerBase                  Shared Memory
+          │
+ ┌────────┼──────────────┐
+ ▼        ▼              ▼
 
-Command Camera     Watchdog
-Worker  Worker      Worker
+Command  Camera     Watchdog
+Worker   Worker      Worker
 ```
 
-The **Communication Framework** manages all ZeroMQ-based communication, while the **TelemetryService** independently retrieves robot telemetry from shared memory.
+The **ZeroMQ Layer** manages communication with the Software Services, while the **Shared Memory Layer** provides low-latency access to robot telemetry.
 
 ---
 
-# Communication Components
+# 3. Communication Components
 
 The framework consists of the following components.
 
@@ -53,15 +54,95 @@ The framework consists of the following components.
 | **ZmqManager** | Creates, manages, starts, and stops all communication workers. |
 | **ZmqWorkerBase** | Provides the common communication interface shared by all communication workers. |
 | **CommandWorker** | Exchanges command messages with the Robot Software. |
-| **CameraWorker** | Receives published RGB image frames and forwards them to the Qt application. |
+| **CameraWorker** | Receives published RGB image frames. |
 | **WatchdogWorker** | Receives subsystem health and status updates. |
 | **TelemetryService** | Reads robot telemetry from shared memory. |
 
-Each component has a dedicated responsibility, allowing communication channels to operate independently while remaining modular and easy to maintain.
+Each component performs a dedicated responsibility, allowing the communication channels to operate independently.
 
 ---
 
-# Communication Flow
+# 4. ZmqWorkerBase
+
+## 4.1 Overview
+
+`ZmqWorkerBase` is the common base class for all ZeroMQ communication workers.
+
+Rather than implementing communication independently, every communication worker inherits from `ZmqWorkerBase`, providing a common interface and a consistent communication lifecycle.
+
+Current workers derived from `ZmqWorkerBase` include:
+
+- CommandWorker
+- CameraWorker
+- WatchdogWorker
+
+```text
+                 QObject
+                    │
+                    ▼
+             ZmqWorkerBase
+                    │
+      ┌─────────────┼─────────────┐
+      ▼             ▼             ▼
+
+CommandWorker  CameraWorker  WatchdogWorker
+```
+
+---
+
+## 4.2 Responsibilities
+
+The base class provides common functionality shared by all communication workers.
+
+Responsibilities include:
+
+- Common worker interface
+- Worker lifecycle management
+- State notifications
+- Error notifications
+- Logging support
+
+Each derived worker implements its own communication logic while reusing the common functionality provided by the base class.
+
+---
+
+# 5. ZmqManager
+
+## 5.1 Overview
+
+`ZmqManager` is the central manager of the Communication Framework.
+
+It is responsible for creating, managing, starting, and stopping all communication workers used by the Qt application.
+
+Instead of every worker being managed independently, the `ZmqManager` provides a single point for controlling the communication framework.
+
+```text
+                  ZmqManager
+                       │
+      ┌────────────────┼────────────────┐
+      ▼                ▼                ▼
+
+Command Worker   Camera Worker   Watchdog Worker
+```
+
+---
+
+## 5.2 Responsibilities
+
+The `ZmqManager` is responsible for:
+
+- Creating communication workers
+- Creating worker threads
+- Assigning workers to threads
+- Starting communication workers
+- Stopping communication workers
+- Managing the worker lifecycle
+
+The manager coordinates the execution of communication workers but does not process communication data itself.
+
+---
+
+# 6. Communication Flow
 
 The Communication Framework exchanges different types of information with the Software Services through dedicated communication channels.
 
@@ -89,13 +170,11 @@ Each communication channel operates independently.
 - **Watchdog Worker** receives subsystem health information through the Router Service.
 - **TelemetryService** independently retrieves robot telemetry through shared memory.
 
-This separation ensures that communication in one channel does not interfere with the others.
-
 ---
 
-# Thread Architecture
+# 7. Thread Architecture
 
-To keep the Qt application responsive, every communication worker executes in its own thread.
+Each communication worker executes in its own thread.
 
 ```text
                  Qt Main Thread
@@ -124,7 +203,7 @@ This architecture provides:
 
 ---
 
-# Shared Memory Communication
+# 8. Shared Memory Communication
 
 Unlike the communication workers, robot telemetry is not exchanged through ZeroMQ.
 
@@ -155,23 +234,23 @@ Using shared memory enables low-latency access to continuously updated robot tel
 
 ---
 
-# Related Documentation
+# 9. Related Documentation
 
-This document provides a high-level overview of the Communication Framework. The implementation details of each communication component are documented separately.
+The implementation details of each communication component are documented separately.
 
 | Document | Description |
 |----------|-------------|
-| **CommandWorker.md** | Bidirectional command communication with the Robot Software. |
-| **CameraWorker.md** | Camera frame subscription, processing, and forwarding. |
-| **WatchdogWorker.md** | Robot subsystem health monitoring. |
-| **TelemetryService.md** | Shared memory telemetry communication. |
+| **CommandWorker.md** | Bidirectional command communication with the Robot Software |
+| **CameraWorker.md** | Camera frame subscription and processing |
+| **WatchdogWorker.md** | Robot subsystem health monitoring |
+| **TelemetryService.md** | Shared memory telemetry communication |
 
 ---
 
-# Summary
+# 10. Summary
 
 The Communication Framework provides a modular and scalable communication infrastructure for the Qt application.
 
-The framework combines a centralized communication manager (**ZmqManager**), a common communication interface (**ZmqWorkerBase**), and specialized communication workers to exchange commands, camera frames, and watchdog information with the Software Services. Real-time robot telemetry is accessed independently through the **TelemetryService** using shared memory.
+The framework combines a centralized communication manager (**ZmqManager**), a common worker interface (**ZmqWorkerBase**), and specialized communication workers to exchange commands, camera frames, and watchdog information with the Software Services. Real-time robot telemetry is accessed independently through the **TelemetryService** using shared memory.
 
 By separating communication into dedicated worker threads and independent communication channels, the framework maintains a responsive user interface while providing reliable, maintainable, and extensible communication between the Qt application and the Software Services.

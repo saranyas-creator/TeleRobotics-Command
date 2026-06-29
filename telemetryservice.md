@@ -200,29 +200,45 @@ The snapshot represents a consistent copy of the latest robot telemetry.
 
 # 3. Shared Memory Consistency
 
-The shared memory is continuously updated by the Software Services while it is being read by the Qt application.
+The Telemetry Service ensures that the telemetry is read only after the writer has completed updating the shared memory.
 
-To ensure that telemetry is not modified during a read operation, the Telemetry Service uses the sequence number stored in shared memory.
+Each telemetry update published by the `SharedTelemetryWriter` is associated with a sequence number (`seq`). The Telemetry Service uses this sequence number to detect whether the shared memory was modified while it was being read.
+
+The consistency check performed by `getLatest()` follows the sequence below.
 
 ```text
-Read Sequence Number
+Read Sequence Number (s1)
         │
         ▼
-Copy Telemetry
+Is seq Odd?
         │
-        ▼
-Read Sequence Number Again
-        │
-        ▼
-Sequence Changed?
-      │        │
-     No       Yes
-      │        │
-      ▼        ▼
- Return    Retry Read
+ ┌──────┴──────┐
+ │             │
+Yes            No
+ │             │
+ ▼             ▼
+Retry      Read Telemetry
+                 │
+                 ▼
+       Read Sequence Number (s2)
+                 │
+                 ▼
+        s1 == s2 ?
+         │         │
+        Yes       No
+         │         │
+         ▼         ▼
+Return Snapshot  Retry Read
 ```
 
-This mechanism guarantees that the Qt application always receives a consistent telemetry snapshot rather than partially updated data.
+The consistency check consists of three steps:
+
+1. Read the current sequence number (`s1`).
+2. If the sequence number is **odd**, the writer is currently updating the shared memory. The service waits and retries the read.
+3. After copying the telemetry values, the sequence number (`s2`) is read again.
+4. If `s1` and `s2` differ, the writer modified the shared memory during the read operation. The service discards the partial data and retries.
+
+Only when both sequence numbers are identical is the telemetry considered consistent and returned to the Qt application.
 
 ---
 

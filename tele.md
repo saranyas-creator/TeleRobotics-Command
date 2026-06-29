@@ -1,133 +1,177 @@
-# VTK Build and Installation Guide
+# Communication Framework
 
-Follow these step-by-step instructions to clone, configure, build, and install VTK with Qt6 support.
+## Overview
 
----
+The **Communication Framework** provides the communication layer between the Qt application and the Software Services. It enables the application to exchange commands, camera frames, watchdog status, and robot telemetry while maintaining a responsive user interface.
 
-# Step 1: Clone VTK Source
+The framework follows a modular architecture in which each communication channel is implemented by an independent worker running in its own thread. These workers are centrally managed by the **ZmqManager** and share a common communication interface through **ZmqWorkerBase**.
 
+Communication within the framework is divided into two categories:
 
-```bash
-# Create directory and navigate into it
-mkdir -p ~/vtk
-cd ~/vtk
+- **ZeroMQ Communication** – Used for commands, camera frames, and watchdog messages.
+- **Shared Memory Communication** – Used for real-time robot telemetry.
 
-# Clone the repository into a folder named 'source'
-git clone https://github.com/Kitware/VTK.git source
-```
+This separation allows each communication mechanism to be optimized for its specific purpose.
 
 ---
 
-# Step 2: Create Build Directory
+# Architecture
 
-Always separate the build files from the source files. Create an isolated build folder.
+The Communication Framework consists of two independent communication layers.
 
-```bash
-cd ~/vtk
+```text
+                    Qt Application
+                           │
+        ┌──────────────────┴──────────────────┐
+        │                                     │
+        ▼                                     ▼
+ Communication Framework            TelemetryService
+        │                                     │
+        ▼                                     ▼
+   ZmqManager                          Shared Memory
+        │
+        ▼
+  ZmqWorkerBase
+        │
+ ┌──────┼──────────────┐
+ ▼      ▼              ▼
 
-mkdir build
-cd build
+Command Camera     Watchdog
+Worker  Worker      Worker
 ```
+
+The **Communication Framework** manages all ZeroMQ-based communication, while the **TelemetryService** independently retrieves robot telemetry from shared memory.
 
 ---
 
-# Step 3: Configure VTK with Qt6
+# Communication Components
 
-Use CMake to generate the build files. This step explicitly points VTK to your local Qt6 installation and enables the required Qt rendering modules.
+The framework consists of the following components.
 
+| Component | Responsibility |
+|-----------|----------------|
+| **ZmqManager** | Creates, manages, starts, and stops all communication workers. |
+| **ZmqWorkerBase** | Provides the common communication interface shared by all communication workers. |
+| **CommandWorker** | Exchanges command messages with the Robot Software. |
+| **CameraWorker** | Receives published RGB image frames and forwards them to the Qt application. |
+| **WatchdogWorker** | Receives subsystem health and status updates. |
+| **TelemetryService** | Reads robot telemetry from shared memory. |
 
-
-```bash
-cmake ../source \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH=/home/<YOUR_USERNAME>/Qt/6.10.3/gcc_64 \
-  -DQt6_DIR=/home/<YOUR_USERNAME>/Qt/6.10.3/gcc_64/lib/cmake/Qt6 \
-  -DVTK_GROUP_ENABLE_Qt=YES \
-  -DVTK_MODULE_ENABLE_VTK_GUISupportQt=YES \
-  -DVTK_MODULE_ENABLE_VTK_RenderingQt=YES \
-  -DVTK_QT_VERSION=6
-```
+Each component has a dedicated responsibility, allowing communication channels to operate independently while remaining modular and easy to maintain.
 
 ---
 
-# Step 4: Verify Qt6 Detection
+# Communication Flow
 
-Verify that CMake correctly detected Qt6 and that no Qt5 references are present.
+The Communication Framework exchanges different types of information with the Software Services through dedicated communication channels.
 
-```bash
-grep "Qt[56]" CMakeCache.txt
+```text
+                 Qt Application
+                        │
+        ┌───────────────┼───────────────┐
+        ▼               ▼               ▼
+
+Command Worker  Camera Worker  Watchdog Worker
+        │               │               │
+        ▼               ▼               ▼
+
+Router      Camera Publisher      Router
+        │               │               │
+        ▼               ▼               ▼
+
+Software Services
 ```
 
-Expected result:
+Each communication channel operates independently.
 
-* Only `Qt6` entries should appear.
-* There should be no `Qt5` references.
+- **Command Worker** exchanges commands and responses through the Router Service.
+- **Camera Worker** subscribes to RGB image frames published by the Camera Publisher.
+- **Watchdog Worker** receives subsystem health information through the Router Service.
+- **TelemetryService** independently retrieves robot telemetry through shared memory.
+
+This separation ensures that communication in one channel does not interfere with the others.
 
 ---
 
-# Step 5: Build VTK
+# Thread Architecture
 
-Compile VTK from source.
+To keep the Qt application responsive, every communication worker executes in its own thread.
 
+```text
+                 Qt Main Thread
+                        │
+                        ▼
+                   ZmqManager
+      ┌─────────────────┼─────────────────┐
+      ▼                 ▼                 ▼
 
-```bash
-make -j2
+Command Thread   Camera Thread   Watchdog Thread
+      │                 │                 │
+      ▼                 ▼                 ▼
+
+Command Worker Camera Worker Watchdog Worker
 ```
+
+Running communication in dedicated worker threads prevents network operations from blocking the Qt event loop.
+
+This architecture provides:
+
+- Responsive user interface
+- Independent communication channels
+- Concurrent communication
+- Improved scalability
+- Simplified maintenance
 
 ---
 
-# Step 6: Install VTK
+# Shared Memory Communication
 
+Unlike the communication workers, robot telemetry is not exchanged through ZeroMQ.
 
+The **TelemetryService** reads telemetry directly from shared memory published by the Software Services.
 
-```bash
-sudo make install
+```text
+Software Services
+        │
+        ▼
+ Shared Memory
+        │
+        ▼
+TelemetryService
+        │
+        ▼
+Qt Application
 ```
+
+The shared telemetry includes:
+
+- Force Feedback
+- STL Position
+- STL Orientation
+- Sequence Number
+- Timestamp
+
+Using shared memory enables low-latency access to continuously updated robot telemetry without introducing additional network communication.
 
 ---
 
-# Step 7: Verify Installation
+# Related Documentation
 
-Verify that `VTKConfig.cmake` was installed successfully.
+This document provides a high-level overview of the Communication Framework. The implementation details of each communication component are documented separately.
 
-```bash
-find /usr/local -name "VTKConfig.cmake"
-```
-
-Example expected output:
-
-```bash
-/usr/local/lib/cmake/vtk-9.5/VTKConfig.cmake
-```
+| Document | Description |
+|----------|-------------|
+| **CommandWorker.md** | Bidirectional command communication with the Robot Software. |
+| **CameraWorker.md** | Camera frame subscription, processing, and forwarding. |
+| **WatchdogWorker.md** | Robot subsystem health monitoring. |
+| **TelemetryService.md** | Shared memory telemetry communication. |
 
 ---
 
-# Step 8: Configure Your Qt Project
+# Summary
 
-Inside your project's `CMakeLists.txt`, add:
+The Communication Framework provides a modular and scalable communication infrastructure for the Qt application.
 
-```cmake
-find_package(VTK REQUIRED COMPONENTS
-    CommonCore
-    CommonColor
-    RenderingCore
-    RenderingOpenGL2
-    InteractionStyle
-    FiltersSources
-    GUISupportQt
-)
+The framework combines a centralized communication manager (**ZmqManager**), a common communication interface (**ZmqWorkerBase**), and specialized communication workers to exchange commands, camera frames, and watchdog information with the Software Services. Real-time robot telemetry is accessed independently through the **TelemetryService** using shared memory.
 
-target_link_libraries(TeleRobotics PRIVATE
-    ${VTK_LIBRARIES}
-)
-
-vtk_module_autoinit(
-    TARGETS TeleRobotics
-    MODULES ${VTK_LIBRARIES}
-)
-```
-
----
-
-
-
+By separating communication into dedicated worker threads and independent communication channels, the framework maintains a responsive user interface while providing reliable, maintainable, and extensible communication between the Qt application and the Software Services.

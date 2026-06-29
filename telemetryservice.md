@@ -222,7 +222,7 @@ Sequence Changed?
  Return    Retry Read
 ```
 
-This mechanism guarantees that the Qt application always receives a consistent telemetry snapshot rather than partially updated data. :contentReference[oaicite:5]{index=5}
+This mechanism guarantees that the Qt application always receives a consistent telemetry snapshot rather than partially updated data.
 
 ---
 
@@ -243,19 +243,21 @@ If telemetry remains stale for an extended period, the service automatically det
 The Qt application retrieves robot telemetry through the Telemetry Service.
 
 ```text
-                 Qt Application
+                  Qt Application
                         │
-                        ▼
+                        ▼  
                 Telemetry Service
                         │
                         ▼
               Telemetry Snapshot
                         │
-                        ▼
-                VTK Mesh Viewer
-                        │
-                        ▼
-                 3D STL Probe
+        ┌───────────────┼────────────────┐
+        ▼                                ▼
+  VTK Mesh Viewer                 Force Monitoring
+        │
+        ▼
+  STL Probe Position
+  STL Probe Orientation
 ```
 
 The telemetry snapshot is used by the Qt application to update the probe visualization.

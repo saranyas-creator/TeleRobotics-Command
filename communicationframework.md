@@ -19,29 +19,24 @@ The framework is designed around a modular worker architecture. Each communicati
 # Architecture
 
 ```text
-                             Qt Application
-                                    │
-         ┌──────────────────────────┼──────────────────────────┐
-         │                          │                          │
-         ▼                          ▼                          ▼
-     User Interface            Viewer Module            Status Widgets
-         │                          │                          │
-         └──────────────────────────┼──────────────────────────┘
-                                    │
-                                    ▼
-                        Communication Framework
-                                    │
-                 ┌──────────────────┴──────────────────┐
-                 │                                     │
-                 ▼                                     ▼
-            ZmqManager                        TelemetryService
-                 │                                     │
-                 ▼                                     ▼
-            ZmqWorkerBase                     Shared Memory
-                 │
-     ┌───────────┼───────────────┐
-     ▼           ▼               ▼
-CommandWorker  CameraWorker  WatchdogWorker
+                     Qt Application
+                           │
+        ┌──────────────────┴──────────────────┐
+        │                                     │
+        ▼                                     ▼
+ Communication Framework            TelemetryService
+        │                                     │
+        ▼                                     ▼
+   ZmqManager                          Shared Memory
+        │
+        ▼
+  ZmqWorkerBase
+        │
+ ┌──────┼──────────────┐
+ ▼      ▼              ▼
+
+Command Camera     Watchdog
+Worker  Worker      Worker
 ```
 
 The Communication Framework consists of two major components:
